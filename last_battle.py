@@ -19,6 +19,7 @@ sym_emj=["<:wrk:1529150229193035917>","<:prd:1529150214764499084>", "<:atc:15296
 blac = "<:blac:1527003711849631855>"
 prd_cst = [20, 10, 10]
 wrk_cst = [10, 20, 10]
+res_mov = [10, 15, 1]
 
 class MyGame:
     def __init__(self):
@@ -26,8 +27,9 @@ class MyGame:
         self.views = [None, None]
         self.grounds = [[[0] * 8 for i in range(8)], [[0] * 8 for i in range(8)]]
         self.rads = [[[0] * 8 for i in range(8)], [[0] * 8 for i in range(8)]]
-        self.counts = [[2, 3, 1], [2, 3, 1]]
+        self.counts = [[2, 2, 1], [2, 2, 1]]
         self.reses = [[20, 20, 1], [20, 20, 1]]
+        self.moveof = False
     def __del__(self):
         print("MyGame deleted")
 
@@ -38,11 +40,10 @@ class MyGame:
         self.views[1].game = self
         self.users[0].game = self
         self.users[1].game = self
-        
         fusers.pop(self.users[0].id, None)
         fusers.pop(self.users[1].id, None)
-        self.users[0].number = 0
-        self.users[1].number = 1
+        self.users[0].number = False
+        self.users[1].number = True
         for i in range(2):
             for j in range(len(self.counts[i])):
                 k=0
@@ -52,6 +53,9 @@ class MyGame:
                     if not self.grounds[i][r1][r2]:
                         self.grounds[i][r1][r2] = j+1
                         k+=1
+        self.views[0].status.content="Your move"
+        print(self.views[0].status)
+        self.views[1].status.content="Opponent's move"
         await self.views[0].show_game()
         await self.views[1].show_game()
     async def user_lost(self, user):
@@ -63,26 +67,36 @@ class MyGame:
         self.views[1].game = None
         self.users[0].game = None
         self.users[1].game = None
-    async def build(self, bder):
+    async def build(self):
+        bder=self.views[self.moveof]
         ask = bder.b_set
         self.grounds[bder.user.number][ask[1]-1][ask[2]-1]=ask[0]
         self.reses[bder.user.number][1]-=prd_cst[ask[0]-1]
         self.reses[bder.user.number][0]-=wrk_cst[ask[0]-1]
-            
+    async def next_user(self):
+        self.views[self.moveof].status.content = "Opponent's move"
+        if self.moveof:
+            for i in range(2):
+                for j in range(3): self.reses[i][j]=self.counts[i][j]*res_mov[j]
+        self.moveof=(self.moveof+1)%2
+        self.views[self.moveof].status.content = "Your move"
+        await self.views[0].show_game()
+        await self.views[1].show_game()
+
 class MyView(DesignerView):
     def __init__(self, user):
         self.user = user
         self.game = None
         self.menu = None
         self.table = None
-        self.screen = None
+        self.screen = TextDisplay("PLACEHOLDER")
+        self.status = TextDisplay("Game menu")
         self.b_set = [0, 0, 0]
         super().__init__(timeout=None)
     async def create_menu(self):
         text1 = TextDisplay("# LAST BATTLE")
-        text2 = TextDisplay("Main menu")
         thumbnail = Thumbnail(bot.user.display_avatar.url)
-        section = Section(text1, text2, accessory=thumbnail)
+        section = Section(text1, self.status, accessory=thumbnail)
         section.add_text("-# Good luck")
         self.menu = Container(section, color=Color.from_rgb(180, 180, 180))
         async def delete_callback(interaction: Interaction):
@@ -117,8 +131,7 @@ class MyView(DesignerView):
         self.table = Container(color=Color.from_rgb(180, 180, 180))
         thumbnail1 = Thumbnail(bot.user.display_avatar.url)
         text3 = TextDisplay("# LAST BATTLE")
-        text4 = TextDisplay("Game interface")
-        section1 = Section(text3, text4, accessory=thumbnail1)
+        section1 = Section(text3, self.status, accessory=thumbnail1)
         self.table.add_item(section1)
         self.add_item(self.table)
         self.screen = TextDisplay(f"Wait a bit...")
@@ -142,9 +155,9 @@ class MyView(DesignerView):
             options = [discord.SelectOption(label=str(i), value=str(i))for i in range(1, 9)])
         x_input = Select(placeholder = "Horizontal", min_values = 1, max_values = 1,
             options = [discord.SelectOption(label=str(i), value=str(i))for i in range(1, 9)])
-        bul_button = Button(label="Proceed Building", style=ButtonStyle.grey)
-        sur_button = Button(label="Surrender", style=ButtonStyle.red)
-        
+        bul_but = Button(label="Proceed Building", style=ButtonStyle.grey)
+        pas_but = Button(label="End the move", style=ButtonStyle.grey)
+        sur_but = Button(label="Surrender", style=ButtonStyle.red)
         async def b_set(interaction: Interaction):
             await interaction.response.defer()
             self.b_set[0]=int(b_input.values[0])
@@ -156,35 +169,33 @@ class MyView(DesignerView):
             self.b_set[2]=int(x_input.values[0])
         async def build_ask(interaction: Interaction):
             if 0 in self.b_set: await interaction.response.send_message("You did not chosed the object or the coordinates",ephemeral=True)
-            elif prd_cst[self.b_set[0]-1]>self.game.reses[self.user.number][0]:
-                await interaction.response.send_message("You don't have enough production right now",ephemeral=True)
-            elif wrk_cst[self.b_set[0]-1]>self.game.reses[self.user.number][1]:
-                await interaction.response.send_message("You don't have enough workforce right now",ephemeral=True)  
+            elif wrk_cst[self.b_set[0]-1]>self.game.reses[self.user.number][0]: await interaction.response.send_message("You don't have enough workforce right now",ephemeral=True)
+            elif prd_cst[self.b_set[0]-1]>self.game.reses[self.user.number][1]: await interaction.response.send_message("You don't have enough production right now",ephemeral=True)
             elif self.game.grounds[self.user.number][self.b_set[1]-1][self.b_set[2]-1]==0:
-                await self.game.build(self)
+                await self.game.build()
                 await self.ground()
                 b_input.value=[]
                 x_input.value=[]
                 y_input.value=[]
                 self.b_set=[0, 0, 0]
                 await interaction.response.edit_message(view=self)
-            else:
-                await interaction.response.send_message("It is already object in this spot",ephemeral=True)
+            else: await interaction.response.send_message("It is already object in this spot",ephemeral=True)
+        async def pass_move(interaction: Interaction):
+            await interaction.response.defer()
+            await self.game.next_user()
         async def surrender(interaction: Interaction):
             await interaction.response.defer()
             await self.game.user_lost(self)
-            
         b_input.callback = b_set
         x_input.callback = x_set
         y_input.callback = y_set
-        bul_button.callback = build_ask
-        sur_button.callback = surrender
-        
+        bul_but.callback = build_ask
+        pas_but.callback = pass_move
+        sur_but.callback = surrender
         row1=ActionRow(b_input)
         row2=ActionRow(x_input)
         row3=ActionRow(y_input)
-        row4=ActionRow(bul_button, sur_button)
-        
+        row4=ActionRow(bul_but, pas_but, sur_but) 
         self.table.add_item(row1)
         self.table.add_item(row2)
         self.table.add_item(row3)
@@ -198,17 +209,12 @@ class MyView(DesignerView):
         self.screen.content+=blac
         for i in range(3):
             self.screen.content+="\n"+num_emj[i+1]
-            for j in range(8):self.screen.content+=obj_emj[ground[i][j]]
+            for j in range(8): self.screen.content+=obj_emj[ground[i][j]]
             self.screen.content+=sym_emj[i]
-            for j in str(res[i]):
-                self.screen.content+=num_emj[int(j)]
+            for j in str(res[i]): self.screen.content+=num_emj[int(j)]
         for i in range(3,8):
             self.screen.content+="\n"+num_emj[i+1]
-            for j in range(8):self.screen.content+=obj_emj[ground[i][j]]
-        self.screen.content+="\n"
-        self.screen.content+="\n"
-
-        print(len(self.screen.content))
+            for j in range(8): self.screen.content+=obj_emj[ground[i][j]]
     async def show_game(self):
         self.clear_items()
         self.add_item(self.table)
@@ -243,8 +249,8 @@ class MyUser:
         await self.thread.add_user(ctx.author)
         await self.thread.send(f"The new game thread for {self.name} was created")
         self.view = MyView(self)
-        await self.view.create_menu()
         await self.view.create_table()
+        await self.view.create_menu()
         self.message = await self.thread.send(view=self.view)
         await self.view.show_menu()
         await ctx.send(f"{self.thread.mention} thread for {self.name} created")
