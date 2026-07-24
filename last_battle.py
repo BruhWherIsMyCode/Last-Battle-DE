@@ -15,7 +15,7 @@ obj_emj=["<:grey:1525893303898214400>", "<:gfac:1525896582036324372>", "<:ghom:1
 num_emj=["<:zero:1527297606986764360>","<:one:1527003069726855270>", "<:two:1527001046713499840>",
          "<:thre:1527003085443043418>", "<:four:1527003120905883648>", "<:five:1527003139335651469>",
          "<:six:1527003153260876039>", "<:sevn:1527003167030509669>", "<:eigt:1527003185309552760>"]
-sym_emj=["<:job:1529150229193035917>","<:cog:1529150214764499084>", "<:shot:1529610411278733402>"]
+sym_emj=["<:wrk:1529150229193035917>","<:prd:1529150214764499084>", "<:atc:1529610411278733402>"]
 blac = "<:blac:1527003711849631855>"
 prd_cst = [20, 10, 10]
 wrk_cst = [10, 20, 10]
@@ -54,7 +54,6 @@ class MyGame:
                         k+=1
         await self.views[0].show_game()
         await self.views[1].show_game()
-        
     async def user_lost(self, user):
         loser_v = user
         winner_v = self.views[(loser_v.user.number+1)%2]
@@ -67,8 +66,8 @@ class MyGame:
     async def build(self, bder):
         ask = bder.b_set
         self.grounds[bder.user.number][ask[1]-1][ask[2]-1]=ask[0]
-        self.reses[bder.user.number][0]-=prd_cst[ask[0]]
-        self.reses[bder.user.number][1]-=prd_cst[ask[0]]
+        self.reses[bder.user.number][1]-=prd_cst[ask[0]-1]
+        self.reses[bder.user.number][0]-=wrk_cst[ask[0]-1]
             
 class MyView(DesignerView):
     def __init__(self, user):
@@ -157,9 +156,9 @@ class MyView(DesignerView):
             self.b_set[2]=int(x_input.values[0])
         async def build_ask(interaction: Interaction):
             if 0 in self.b_set: await interaction.response.send_message("You did not chosed the object or the coordinates",ephemeral=True)
-            elif prd_cst[self.b_set[0]]>self.game.reses[self.user.number][0]:
+            elif prd_cst[self.b_set[0]-1]>self.game.reses[self.user.number][0]:
                 await interaction.response.send_message("You don't have enough production right now",ephemeral=True)
-            elif wrk_cst[self.b_set[0]]>self.game.reses[self.user.number][1]:
+            elif wrk_cst[self.b_set[0]-1]>self.game.reses[self.user.number][1]:
                 await interaction.response.send_message("You don't have enough workforce right now",ephemeral=True)  
             elif self.game.grounds[self.user.number][self.b_set[1]-1][self.b_set[2]-1]==0:
                 await self.game.build(self)
