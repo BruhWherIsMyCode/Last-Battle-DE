@@ -68,7 +68,7 @@ class MyGame:
         ask = bder.b_set
         self.grounds[bder.user.number][ask[1]-1][ask[2]-1]=ask[0]
         self.reses[bder.user.number][0]-=prd_cst[ask[0]]
-        self.reses[bder.user.number][1]-=prd_cst[ask[1]]
+        self.reses[bder.user.number][1]-=prd_cst[ask[0]]
             
 class MyView(DesignerView):
     def __init__(self, user):
@@ -196,6 +196,7 @@ class MyView(DesignerView):
         res = self.game.reses[num]
         self.screen.content=f""+blac
         for i in range(1,9): self.screen.content += num_emj[i]
+        self.screen.content+=blac
         for i in range(3):
             self.screen.content+="\n"+num_emj[i+1]
             for j in range(8):self.screen.content+=obj_emj[ground[i][j]]
