@@ -171,6 +171,7 @@ class MyView(DesignerView):
             if 0 in self.b_set: await interaction.response.send_message("You did not chosed the object or the coordinates",ephemeral=True)
             elif wrk_cst[self.b_set[0]-1]>self.game.reses[self.user.number][0]: await interaction.response.send_message("You don't have enough workforce right now",ephemeral=True)
             elif prd_cst[self.b_set[0]-1]>self.game.reses[self.user.number][1]: await interaction.response.send_message("You don't have enough production right now",ephemeral=True)
+            elif self.game.moveof != self.user.number: await interaction.response.send_message("It's not your move!",ephemeral=True)
             elif self.game.grounds[self.user.number][self.b_set[1]-1][self.b_set[2]-1]==0:
                 await self.game.build()
                 await self.ground()
@@ -181,8 +182,10 @@ class MyView(DesignerView):
                 await interaction.response.edit_message(view=self)
             else: await interaction.response.send_message("It is already object in this spot",ephemeral=True)
         async def pass_move(interaction: Interaction):
-            await interaction.response.defer()
-            await self.game.next_user()
+            if self.game.moveof != self.user.number: await interaction.response.send_message("It's not your move!",ephemeral=True)
+            else:
+                await interaction.response.defer()
+                await self.game.next_user()
         async def surrender(interaction: Interaction):
             await interaction.response.defer()
             await self.game.user_lost(self)
@@ -222,11 +225,11 @@ class MyView(DesignerView):
         await self.message.edit(view=self) 
     async def defeat(self):
         await self.show_menu()
-        self.menu.add_item(TextDisplay("You lost. Better luck next time!"))
+        self.menu.status.content = "Your move"
         await self.user.message.edit(view=self)
     async def victory(self):
         await self.show_menu()
-        self.menu.add_item(TextDisplay("You won! Congrats with survival!"))
+        self.menu.status.content = "Your move"
         await self.user.message.edit(view=self)
 
 class MyUser:
