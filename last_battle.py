@@ -10,16 +10,21 @@ from discord.ui import (ActionRow, Button, Container, DesignerView,
     MediaGallery, Section, Select, Separator, TextDisplay, Thumbnail, button)
 
 fusers = {}
-rad_emj=["<:grey:1525893303898214400>", "<:gren:1497928981188575232>"]
+modes=["Building mode","Atack mode","Radiation mode"]
+rad_emj=["<:0rd:1527003711849631855>",  "<:1rd:1530616688117022800>","<:2rd:1530616711437357146>",
+         "<:3rd:1530616727229173780>","<:4rd:1530616745709146184>","<:5rd:1530616774108647476>",
+         "<:6rd:1530616796111966318>","<:7rd:1530616814227427388>","<:8rd:1530616829452750880>"]
 obj_emj=["<:grey:1525893303898214400>", "<:gfac:1525896582036324372>", "<:ghom:1525985697612304537>", "<:glan:1529613092257005744>"]
 num_emj=["<:zero:1527297606986764360>","<:one:1527003069726855270>", "<:two:1527001046713499840>",
          "<:thre:1527003085443043418>", "<:four:1527003120905883648>", "<:five:1527003139335651469>",
          "<:six:1527003153260876039>", "<:sevn:1527003167030509669>", "<:eigt:1527003185309552760>"]
 sym_emj=["<:wrk:1529150229193035917>","<:prd:1529150214764499084>", "<:atc:1529610411278733402>"]
-blac = "<:blac:1527003711849631855>"
+wep_emj=["huh","<:nuke:1530907025855483994>"]
+blac = "<:0rd:1527003711849631855>"
 prd_cst = [20, 10, 10]
 wrk_cst = [10, 20, 10]
-res_mov = [10, 15, 1]
+rck_cst = [5]
+res_mov = [10, 10, 1]
 
 class MyGame:
     def __init__(self):
@@ -92,6 +97,7 @@ class MyView(DesignerView):
         self.screen = TextDisplay("PLACEHOLDER")
         self.status = TextDisplay("Game menu")
         self.b_set = [0, 0, 0]
+        self.r_set = [0, 0, 0]
         super().__init__(timeout=None)
     async def create_menu(self):
         text1 = TextDisplay("# LAST BATTLE")
@@ -105,8 +111,7 @@ class MyView(DesignerView):
             await interaction.response.defer()
             await self.user.thread.delete()
         async def play_callback(interaction: Interaction):
-            if self.user.id in fusers:
-                await interaction.response.send_message("You already are waiting for opponent",ephemeral=True)
+            if self.user.id in fusers: await interaction.response.send_message("You already are waiting for opponent",ephemeral=True)
             elif len(fusers) == 0:
                 fusers[self.user.id] = self.user
                 await interaction.response.send_message("Waiting for the opponent",ephemeral=True)
@@ -136,7 +141,17 @@ class MyView(DesignerView):
         self.add_item(self.table)
         self.screen = TextDisplay(f"Wait a bit...")
         self.table.add_item(self.screen)
-
+        m_input = Select(placeholder = modes[0], min_values = 1, max_values = 1,
+            options = [
+                discord.SelectOption(label = "Building mode", value="0"),
+                discord.SelectOption(label = "Atacking mode", value="1"),
+                discord.SelectOption(label = "Radiation mode", value="2")])
+        r_input = Select(placeholder = "Rocket", min_values = 1, max_values = 1,
+            options = [
+                discord.SelectOption(
+                    label="Ordinal nuke, 10 prod",
+                    value="1",
+                    emoji=discord.PartialEmoji(name="nuke",id=1530907025855483994))])
         b_input = Select(placeholder = "Object", min_values = 1, max_values = 1,
             options = [
                 discord.SelectOption(
@@ -155,81 +170,107 @@ class MyView(DesignerView):
             options = [discord.SelectOption(label=str(i), value=str(i))for i in range(1, 9)])
         x_input = Select(placeholder = "Horizontal", min_values = 1, max_values = 1,
             options = [discord.SelectOption(label=str(i), value=str(i))for i in range(1, 9)])
-        bul_but = Button(label="Proceed Building", style=ButtonStyle.grey)
+        prc_but = Button(label="PROCEED", style=ButtonStyle.green)
         pas_but = Button(label="End the move", style=ButtonStyle.grey)
+        hel_but = Button(label="Help", style=ButtonStyle.grey)
         sur_but = Button(label="Surrender", style=ButtonStyle.red)
+        async def m_set(interaction: Interaction):
+            m_input.placeholder = modes[int(m_input.values[0])]
+            await self.sh_map(int(m_input.values[0]))
+            await interaction.response.edit_message(view=self)
+        async def r_set(interaction: Interaction):
+            await interaction.response.defer()
+            self.r_set[0]=int(r_input.values[0])
         async def b_set(interaction: Interaction):
             await interaction.response.defer()
             self.b_set[0]=int(b_input.values[0])
         async def y_set(interaction: Interaction):
             await interaction.response.defer()
             self.b_set[1]=int(y_input.values[0])
+            self.r_set[1]=int(y_input.values[0])
         async def x_set(interaction: Interaction):
             await interaction.response.defer()
             self.b_set[2]=int(x_input.values[0])
-        async def build_ask(interaction: Interaction):
-            if 0 in self.b_set: await interaction.response.send_message("You did not chosed the object or the coordinates",ephemeral=True)
+            self.r_set[2]=int(x_input.values[0])
+        async def act_ask(interaction: Interaction):
+            if self.game.moveof != self.user.number: await interaction.response.send_message("It's not your move!",ephemeral=True)
+            elif 0 in self.b_set: await interaction.response.send_message("You did not chosed the object or the coordinates",ephemeral=True)
+            elif self.game.grounds[self.user.number][self.b_set[1]-1][self.b_set[2]-1]!=0: await interaction.response.send_message("It is already an object in this spot",ephemeral=True)
             elif wrk_cst[self.b_set[0]-1]>self.game.reses[self.user.number][0]: await interaction.response.send_message("You don't have enough workforce right now",ephemeral=True)
             elif prd_cst[self.b_set[0]-1]>self.game.reses[self.user.number][1]: await interaction.response.send_message("You don't have enough production right now",ephemeral=True)
-            elif self.game.moveof != self.user.number: await interaction.response.send_message("It's not your move!",ephemeral=True)
-            elif self.game.grounds[self.user.number][self.b_set[1]-1][self.b_set[2]-1]==0:
+            else:
                 await self.game.build()
-                await self.ground()
+                await self.sh_map(0)
                 b_input.value=[]
                 x_input.value=[]
                 y_input.value=[]
                 self.b_set=[0, 0, 0]
+                self.r_set=[0, 0, 0]
                 await interaction.response.edit_message(view=self)
-            else: await interaction.response.send_message("It is already object in this spot",ephemeral=True)
         async def pass_move(interaction: Interaction):
             if self.game.moveof != self.user.number: await interaction.response.send_message("It's not your move!",ephemeral=True)
             else:
                 await interaction.response.defer()
                 await self.game.next_user()
+        async def hint(interaction: Interaction):
+            await interaction.response.send_message("This function is not ready yet",ephemeral=True)
         async def surrender(interaction: Interaction):
             await interaction.response.defer()
             await self.game.user_lost(self)
+        m_input.callback = m_set
         b_input.callback = b_set
         x_input.callback = x_set
         y_input.callback = y_set
-        bul_but.callback = build_ask
+        prc_but.callback = act_ask
+        hel_but.callback = hint
         pas_but.callback = pass_move
         sur_but.callback = surrender
+        row0=ActionRow(m_input)
         row1=ActionRow(b_input)
         row2=ActionRow(x_input)
         row3=ActionRow(y_input)
-        row4=ActionRow(bul_but, pas_but, sur_but) 
+        row4=ActionRow(prc_but, hel_but, pas_but, sur_but)
+        self.table.add_item(row0)
         self.table.add_item(row1)
         self.table.add_item(row2)
         self.table.add_item(row3)
         self.table.add_item(row4)
-    async def ground(self):
+    async def sh_map(self, mode):
         num = self.user.number
-        ground = self.game.grounds[num]
+        match mode:
+            case 0:
+                    ground = self.game.grounds[num]
+                    emj_set = obj_emj
+            case 1:
+                    ground = self.game.rads[num]
+                    emj_set = rad_emj
+            case 2:
+                    ground = self.game.rads[(num+1)%2]
+                    emj_set = rad_emj
         res = self.game.reses[num]
         self.screen.content=f""+blac
         for i in range(1,9): self.screen.content += num_emj[i]
         self.screen.content+=blac
         for i in range(3):
             self.screen.content+="\n"+num_emj[i+1]
-            for j in range(8): self.screen.content+=obj_emj[ground[i][j]]
+            for j in range(8): self.screen.content+=emj_set[ground[i][j]]
             self.screen.content+=sym_emj[i]
             for j in str(res[i]): self.screen.content+=num_emj[int(j)]
         for i in range(3,8):
             self.screen.content+="\n"+num_emj[i+1]
-            for j in range(8): self.screen.content+=obj_emj[ground[i][j]]
+            for j in range(8): self.screen.content+=emj_set[ground[i][j]]
     async def show_game(self):
         self.clear_items()
         self.add_item(self.table)
-        await self.ground()
+        await self.sh_map(0)
         await self.message.edit(view=self) 
     async def defeat(self):
         await self.show_menu()
-        self.menu.status.content = "Your move"
+        self.status.content = "You lost. But you can play again!"
         await self.user.message.edit(view=self)
     async def victory(self):
         await self.show_menu()
-        self.menu.status.content = "Your move"
+        self.status.content = "You won, congrats with survival! One more round?"
         await self.user.message.edit(view=self)
 
 class MyUser:
