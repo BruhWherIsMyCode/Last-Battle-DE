@@ -96,6 +96,8 @@ class MyView(DesignerView):
         self.table = None
         self.screen = TextDisplay("PLACEHOLDER")
         self.status = TextDisplay("Game menu")
+        self.selects = []
+        self.rovv = None
         self.b_set = [0, 0, 0]
         self.r_set = [0, 0, 0]
         super().__init__(timeout=None)
@@ -146,26 +148,28 @@ class MyView(DesignerView):
                 discord.SelectOption(label = "Building mode", value="0"),
                 discord.SelectOption(label = "Atacking mode", value="1"),
                 discord.SelectOption(label = "Radiation mode", value="2")])
-        r_input = Select(placeholder = "Rocket", min_values = 1, max_values = 1,
-            options = [
-                discord.SelectOption(
-                    label="Ordinal nuke, 10 prod",
-                    value="1",
-                    emoji=discord.PartialEmoji(name="nuke",id=1530907025855483994))])
-        b_input = Select(placeholder = "Object", min_values = 1, max_values = 1,
-            options = [
-                discord.SelectOption(
-                    label="Overground factory, 20 prod, 10 work",
-                    value="1",
-                    emoji=discord.PartialEmoji(name="gfac",id=1525896582036324372)),
-                discord.SelectOption(
-                    label="Overground city, 10 prod, 20 work",
-                    value="2",
-                    emoji=discord.PartialEmoji(name="ghom",id=1525985697612304537)),
-                discord.SelectOption(
-                    label="Launching_platform, 10 prod, 10 work",
-                    value="3",
-                    emoji=discord.PartialEmoji(name="glan",id=1529613092257005744))])
+        self.selects.append(
+            Select(placeholder = "Object", min_values = 1, max_values = 1,
+                options = [
+                    discord.SelectOption(
+                        label="Overground factory, 20 prod, 10 work",
+                        value="1",
+                        emoji=discord.PartialEmoji(name="gfac",id=1525896582036324372)),
+                    discord.SelectOption(
+                        label="Overground city, 10 prod, 20 work",
+                        value="2",
+                        emoji=discord.PartialEmoji(name="ghom",id=1525985697612304537)),
+                    discord.SelectOption(
+                        label="Launching_platform, 10 prod, 10 work",
+                        value="3",
+                        emoji=discord.PartialEmoji(name="glan",id=1529613092257005744))]))
+        self.selects.append(
+            Select(placeholder = "Rocket", min_values = 1, max_values = 1,
+                options = [
+                    discord.SelectOption(
+                        label="Ordinal nuke, 10 prod",
+                        value="1",
+                        emoji=discord.PartialEmoji(name="nuke",id=1530907025855483994))]))
         y_input = Select(placeholder = "Vertical", min_values = 1, max_values = 1,
             options = [discord.SelectOption(label=str(i), value=str(i))for i in range(1, 9)])
         x_input = Select(placeholder = "Horizontal", min_values = 1, max_values = 1,
@@ -175,15 +179,20 @@ class MyView(DesignerView):
         hel_but = Button(label="Help", style=ButtonStyle.grey)
         sur_but = Button(label="Surrender", style=ButtonStyle.red)
         async def m_set(interaction: Interaction):
-            m_input.placeholder = modes[int(m_input.values[0])]
-            await self.sh_map(int(m_input.values[0]))
+            mod = int(m_input.values[0])
+            m_input.placeholder = modes[mod]
+            await self.sh_map(mod)
+            try:
+                self.rovv.remove_item(self.selects[(mod+1)%2])
+                self.rovv.add_item(self.selects[mod%2])
+            except: pass
             await interaction.response.edit_message(view=self)
-        async def r_set(interaction: Interaction):
-            await interaction.response.defer()
-            self.r_set[0]=int(r_input.values[0])
         async def b_set(interaction: Interaction):
             await interaction.response.defer()
             self.b_set[0]=int(b_input.values[0])
+        async def r_set(interaction: Interaction):
+            await interaction.response.defer()
+            self.r_set[0]=int(r_input.values[0])
         async def y_set(interaction: Interaction):
             await interaction.response.defer()
             self.b_set[1]=int(y_input.values[0])
@@ -218,7 +227,8 @@ class MyView(DesignerView):
             await interaction.response.defer()
             await self.game.user_lost(self)
         m_input.callback = m_set
-        b_input.callback = b_set
+        self.selects[0].callback = b_set
+        self.selects[1].callback = r_set
         x_input.callback = x_set
         y_input.callback = y_set
         prc_but.callback = act_ask
@@ -226,12 +236,12 @@ class MyView(DesignerView):
         pas_but.callback = pass_move
         sur_but.callback = surrender
         row0=ActionRow(m_input)
-        row1=ActionRow(b_input)
+        self.rovv=ActionRow(self.selects[0])
         row2=ActionRow(x_input)
         row3=ActionRow(y_input)
         row4=ActionRow(prc_but, hel_but, pas_but, sur_but)
         self.table.add_item(row0)
-        self.table.add_item(row1)
+        self.table.add_item(self.rovv)
         self.table.add_item(row2)
         self.table.add_item(row3)
         self.table.add_item(row4)
