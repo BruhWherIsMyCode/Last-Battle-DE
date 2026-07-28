@@ -25,6 +25,7 @@ prd_cst = [20, 10, 10]
 wrk_cst = [10, 20, 10]
 rck_cst = [10]
 res_mov = [10, 10, 1]
+rad_rck = [5]
 
 class MyGame:
     def __init__(self):
@@ -75,9 +76,18 @@ class MyGame:
     async def proceed(self):
         bder=self.views[self.moveof]
         ask = bder.g_set
-        self.grounds[bder.user.number][ask[1]-1][ask[2]-1]=ask[0]
-        self.reses[bder.user.number][1]-=prd_cst[ask[0]-1]
-        self.reses[bder.user.number][0]-=wrk_cst[ask[0]-1]
+        num=bder.user.number
+        if bder.g_set[3]!=1:
+            self.grounds[num][ask[1]-1][ask[2]-1]=ask[0]
+            self.reses[num][1]-=prd_cst[ask[0]-1]
+            self.reses[num][0]-=wrk_cst[ask[0]-1]
+        else:
+            self.grounds[(num+1)%2][ask[1]-1][ask[2]-1]=0
+            self.reses[num][1]-=rck_cst[ask[0]-1]
+            self.reses[num][2]-=1
+            if self.rads[(num+1)%2][ask[1]-1][ask[2]-1]<rad_rck[ask[0]-1]:
+                self.rads[(num+1)%2][ask[1]-1][ask[2]-1]=rad_rck[ask[0]-1]
+                
     async def next_user(self):
         self.views[self.moveof].status.content = "Opponent's move"
         if self.moveof:
@@ -184,9 +194,10 @@ class MyView(DesignerView):
             self.g_set[0] = 0
             try:
                 self.rovv.remove_item(self.selects[(mod+1)%2])
-                self.g_set[3]=1+(mod)%2
+                self.g_set[3]=mod
                 self.rovv.add_item(self.selects[mod%2])
             except: pass
+            print(self.g_set[3])
             await interaction.response.edit_message(view=self)
         async def b_set(interaction: Interaction):
             await interaction.response.defer()
@@ -203,13 +214,24 @@ class MyView(DesignerView):
         async def act_ask(interaction: Interaction):
             if self.game.moveof != self.user.number: await interaction.response.send_message("It's not your move!",ephemeral=True)
             elif 0 in self.g_set: await interaction.response.send_message("You did not chosed the object or the coordinates",ephemeral=True)
-            elif self.g_set[3]: await interaction.response.send_message("Nobody would notice",ephemeral=True)
+            elif self.g_set[3]==1:
+                if not self.game.reses[self.user.number][2]: await interaction.response.send_message("You don't have any free launch platforms",ephemeral=True)
+                if rck_cst[self.g_set[0]-1]>self.game.reses[self.user.number][1]: await interaction.response.send_message("You don't have enough production right now",ephemeral=True)
+                else:
+                    await self.game.proceed()
+                    await self.sh_map(1)
+                    self.selects[0].value=[]
+                    self.selects[1].value=[]
+                    x_input.value=[]
+                    y_input.value=[]
+                    self.g_set=[0, 0, 0, self.g_set[3]]
+                    await interaction.response.edit_message(view=self)
             elif self.game.grounds[self.user.number][self.g_set[1]-1][self.g_set[2]-1]!=0: await interaction.response.send_message("It is already an object in this spot",ephemeral=True)
             elif wrk_cst[self.g_set[0]-1]>self.game.reses[self.user.number][0]: await interaction.response.send_message("You don't have enough workforce right now",ephemeral=True)
             elif prd_cst[self.g_set[0]-1]>self.game.reses[self.user.number][1]: await interaction.response.send_message("You don't have enough production right now",ephemeral=True)
             else:
-                await self.game.build()
-                await self.sh_map(0)
+                await self.game.proceed()
+                await self.sh_map(int(self.g_set[3]-1))
                 self.selects[0].value=[]
                 self.selects[1].value=[]
                 x_input.value=[]
