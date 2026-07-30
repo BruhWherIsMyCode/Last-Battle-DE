@@ -37,7 +37,7 @@ class MyGame:
         self.reses = [[20, 20, 1], [20, 20, 1]]
         self.moveof = False
     def __del__(self):
-        print("MyGame deleted")
+        print("game session deleted")
 
     async def create(self, player1, player2):
         self.users= [player1, player2]
@@ -77,7 +77,7 @@ class MyGame:
         bder=self.views[self.moveof]
         ask = bder.g_set
         num=bder.user.number
-        if bder.g_set[3]!=1:
+        if bder.g_set[3]!=2:
             self.grounds[num][ask[1]-1][ask[2]-1]=ask[0]
             self.reses[num][1]-=prd_cst[ask[0]-1]
             self.reses[num][0]-=wrk_cst[ask[0]-1]
@@ -87,6 +87,10 @@ class MyGame:
             self.reses[num][2]-=1
             if self.rads[(num+1)%2][ask[1]-1][ask[2]-1]<rad_rck[ask[0]-1]:
                 self.rads[(num+1)%2][ask[1]-1][ask[2]-1]=rad_rck[ask[0]-1]
+            await self.views[(num+1)%2].sh_map(self.views[(num+1)%2].g_set[3]-1)
+            await self.users[(num+1)%2].message.edit(view=self.views[(num+1)%2])
+            t="Your object was destroyed! Coordinates: h=" + str(ask[1]-1) + ", w=" + str(ask[2]-1)
+            await self.users[(num+1)%2].temp_msg(t)
                 
     async def next_user(self):
         self.views[self.moveof].status.content = "Opponent's move"
@@ -105,11 +109,13 @@ class MyView(DesignerView):
         self.menu = None
         self.table = None
         self.screen = TextDisplay("PLACEHOLDER")
-        self.status = TextDisplay("Game menu")
+        self.status = TextDisplay("Welcome! Start a game to play")
         self.selects = []
         self.rovv = None
-        self.g_set = [0, 0, 0, 0]
+        self.g_set = [0, 0, 0, 1]
         super().__init__(timeout=None)
+    def __del__(self):
+        print("game view deleted")
     async def create_menu(self):
         text1 = TextDisplay("# LAST BATTLE")
         thumbnail = Thumbnail(bot.user.display_avatar.url)
@@ -118,9 +124,11 @@ class MyView(DesignerView):
         self.menu = Container(section, color=Color.from_rgb(180, 180, 180))
         async def delete_callback(interaction: Interaction):
             fusers.pop(self.user.id, None)
-            self.stop()
             await interaction.response.defer()
             await self.user.thread.delete()
+            self.stop()
+            self.user.view = None
+            self.user = None
         async def play_callback(interaction: Interaction):
             if self.user.id in fusers: await interaction.response.send_message("You already are waiting for opponent",ephemeral=True)
             elif len(fusers) == 0:
@@ -192,9 +200,9 @@ class MyView(DesignerView):
             m_input.placeholder = modes[mod]
             await self.sh_map(mod)
             self.g_set[0] = 0
+            self.g_set[3]=mod+1
             try:
                 self.rovv.remove_item(self.selects[(mod+1)%2])
-                self.g_set[3]=mod
                 self.rovv.add_item(self.selects[mod%2])
             except: pass
             print(self.g_set[3])
@@ -214,7 +222,7 @@ class MyView(DesignerView):
         async def act_ask(interaction: Interaction):
             if self.game.moveof != self.user.number: await interaction.response.send_message("It's not your move!",ephemeral=True)
             elif 0 in self.g_set: await interaction.response.send_message("You did not chosed the object or the coordinates",ephemeral=True)
-            elif self.g_set[3]==1:
+            elif self.g_set[3]==2:
                 if not self.game.reses[self.user.number][2]: await interaction.response.send_message("You don't have any free launch platforms",ephemeral=True)
                 if rck_cst[self.g_set[0]-1]>self.game.reses[self.user.number][1]: await interaction.response.send_message("You don't have enough production right now",ephemeral=True)
                 else:
@@ -274,10 +282,10 @@ class MyView(DesignerView):
                     ground = self.game.grounds[num]
                     emj_set = obj_emj
             case 1:
-                    ground = self.game.rads[num]
+                    ground = self.game.rads[(num+1)%2]
                     emj_set = rad_emj
             case 2:
-                    ground = self.game.rads[(num+1)%2]
+                    ground = self.game.rads[num]
                     emj_set = rad_emj
         res = self.game.reses[num]
         self.screen.content=f""+blac
@@ -305,6 +313,24 @@ class MyView(DesignerView):
         self.status.content = "You won, congrats with survival! One more round?"
         await self.user.message.edit(view=self)
 
+class T_mes(DesignerView):
+    def __init__(self, t):
+        self.txt = t
+        super().__init__(timeout=None)
+        text1 = TextDisplay("# MESSAGE")
+        text2 = TextDisplay(self.txt)
+        okay = Button(label="OK", style=ButtonStyle.grey)
+        async def ok(interaction: Interaction):
+            await interaction.message.delete()
+            self.stop()
+        okay.callback = ok
+        row = ActionRow(okay)
+        window = Container(row, text1, text2)
+        self.add_item(window)
+    def __del__(self):
+        print("temporal message deleted")
+        
+
 class MyUser:
     def __init__(self):
         self.id = None
@@ -314,9 +340,10 @@ class MyUser:
         self.game = None
         self.message = None
         self.number = None
+    def __del__(self):
+        print("game view deleted")
     @classmethod
     async def create(cls, ctx: discord.ApplicationContext):
-        global users
         self = cls()
         self.name = ctx.author.name
         self.id = ctx.author.id
@@ -331,7 +358,10 @@ class MyUser:
         await self.view.show_menu()
         await ctx.send(f"{self.thread.mention} thread for {self.name} created")
         return self
-
+    async def temp_msg(self, txt):
+        temp = T_mes(txt)
+        await self.thread.send(view=temp)
+        
 bot = Bot()
 
 @bot.event
