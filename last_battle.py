@@ -10,22 +10,24 @@ from discord.ui import (ActionRow, Button, Container, DesignerView,
     MediaGallery, Section, Select, Separator, TextDisplay, Thumbnail, button)
 
 fusers = {}
-modes=["Building mode","Atack mode","Radiation mode"]
-rad_emj=["<:0rd:1527003711849631855>",  "<:1rd:1530616688117022800>","<:2rd:1530616711437357146>",
+modes=("Building mode","Atack mode","Radiation mode",)
+rad_emj=("<:0rd:1532872671484838139>",  "<:1rd:1530616688117022800>","<:2rd:1530616711437357146>",
          "<:3rd:1530616727229173780>","<:4rd:1530616745709146184>","<:5rd:1530616774108647476>",
-         "<:6rd:1530616796111966318>","<:7rd:1530616814227427388>","<:8rd:1530616829452750880>"]
-obj_emj=["<:grey:1525893303898214400>", "<:gfac:1525896582036324372>", "<:ghom:1525985697612304537>", "<:glan:1529613092257005744>"]
-num_emj=["<:zero:1527297606986764360>","<:one:1527003069726855270>", "<:two:1527001046713499840>",
+         "<:6rd:1530616796111966318>","<:7rd:1530616814227427388>","<:8rd:1530616829452750880>",)
+obj_emj=("<:grey:1525893303898214400>", "<:gfac:1525896582036324372>", "<:ghom:1525985697612304537>", "<:glan:1529613092257005744>",)
+num_emj=("<:zero:1527297606986764360>","<:one:1527003069726855270>", "<:two:1527001046713499840>",
          "<:thre:1527003085443043418>", "<:four:1527003120905883648>", "<:five:1527003139335651469>",
-         "<:six:1527003153260876039>", "<:sevn:1527003167030509669>", "<:eigt:1527003185309552760>"]
-sym_emj=["<:wrk:1529150229193035917>","<:prd:1529150214764499084>", "<:atc:1529610411278733402>"]
-wep_emj=["huh","<:nuke:1530907025855483994>"]
-blac = "<:0rd:1527003711849631855>"
-prd_cst = [20, 10, 10]
-wrk_cst = [10, 20, 10]
-rck_cst = [10]
-res_mov = [10, 10, 1]
-rad_rck = [5]
+         "<:six:1527003153260876039>", "<:sevn:1527003167030509669>", "<:eigt:1527003185309552760>",)
+sym_emj=("<:wrk:1529150229193035917>","<:prd:1529150214764499084>", "<:atc:1529610411278733402>",)
+wep_emj=("huh","<:nuke:1530907025855483994>",)
+blac = "<:black:1527003711849631855>"
+prd_cst = (20, 10, 10,)
+wrk_cst = (10, 20, 10,)
+rck_cst = (10,)
+res_mov = (10, 10, 1,)
+rad_rck = (4,)
+rad_obj = (2, 1, 0,)
+rad_shw = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2,)
 
 class MyGame:
     def __init__(self):
@@ -36,9 +38,7 @@ class MyGame:
         self.counts = [[2, 2, 1], [2, 2, 1]]
         self.reses = [[20, 20, 1], [20, 20, 1]]
         self.moveof = False
-    def __del__(self):
-        print("game session deleted")
-
+    def __del__(self): print("game session deleted")
     async def create(self, player1, player2):
         self.users= [player1, player2]
         self.views = [self.users[0].view, self.users[1].view]
@@ -81,22 +81,31 @@ class MyGame:
             self.grounds[num][ask[1]-1][ask[2]-1]=ask[0]
             self.reses[num][1]-=prd_cst[ask[0]-1]
             self.reses[num][0]-=wrk_cst[ask[0]-1]
+            self.counts[num][ask[0]-1]+=1
         else:
-            self.grounds[(num+1)%2][ask[1]-1][ask[2]-1]=0
+            if self.grounds[(num+1)%2][ask[1]-1][ask[2]-1]!=0:
+                self.counts[(num+1)%2][self.grounds[(num+1)%2][ask[1]-1][ask[2]-1]-1]-=1
+                if self.counts[(num+1)%2][0]==0: await self.user_lost(self.users[(num+1)%2])
+                else:
+                    t="Your object was destroyed! Coordinates: h=" + str(ask[1]) + ", w=" + str(ask[2])
+                    await self.users[(num+1)%2].temp_msg(t)
+                    self.grounds[(num+1)%2][ask[1]-1][ask[2]-1]=0
             self.reses[num][1]-=rck_cst[ask[0]-1]
             self.reses[num][2]-=1
-            if self.rads[(num+1)%2][ask[1]-1][ask[2]-1]<rad_rck[ask[0]-1]:
-                self.rads[(num+1)%2][ask[1]-1][ask[2]-1]=rad_rck[ask[0]-1]
+            if self.rads[(num+1)%2][ask[1]-1][ask[2]-1]<rad_rck[ask[0]-1]: self.rads[(num+1)%2][ask[1]-1][ask[2]-1]=rad_rck[ask[0]-1]
             await self.views[(num+1)%2].sh_map(self.views[(num+1)%2].g_set[3]-1)
             await self.users[(num+1)%2].message.edit(view=self.views[(num+1)%2])
-            t="Your object was destroyed! Coordinates: h=" + str(ask[1]-1) + ", w=" + str(ask[2]-1)
-            await self.users[(num+1)%2].temp_msg(t)
-                
     async def next_user(self):
         self.views[self.moveof].status.content = "Opponent's move"
-        if self.moveof:
-            for i in range(2):
-                for j in range(3): self.reses[i][j]=self.counts[i][j]*res_mov[j]
+        for i in range(3): self.reses[self.moveof][i]=self.counts[self.moveof][i]*res_mov[i]
+        for i in range(8):
+            for j in range(8):
+                if self.grounds[self.moveof][i][j]!=0:
+                    if self.rads[self.moveof][i][j]<=rad_obj[self.grounds[self.moveof][i][j]-1]: self.rads[self.moveof][i][j]=rad_obj[self.grounds[self.moveof][i][j]-1]
+                    else: self.rads[self.moveof][i][j]-=1
+                elif self.rads[self.moveof][i][j]>2: self.rads[self.moveof][i][j]-=1
+                else:
+                    self.rads[self.moveof][i][j]=rad_shw[random.randint(0,17)]
         self.moveof=(self.moveof+1)%2
         self.views[self.moveof].status.content = "Your move"
         await self.views[0].show_game()
@@ -114,8 +123,7 @@ class MyView(DesignerView):
         self.rovv = None
         self.g_set = [0, 0, 0, 1]
         super().__init__(timeout=None)
-    def __del__(self):
-        print("game view deleted")
+    def __del__(self): print("game view deleted")
     async def create_menu(self):
         text1 = TextDisplay("# LAST BATTLE")
         thumbnail = Thumbnail(bot.user.display_avatar.url)
@@ -224,7 +232,7 @@ class MyView(DesignerView):
             elif 0 in self.g_set: await interaction.response.send_message("You did not chosed the object or the coordinates",ephemeral=True)
             elif self.g_set[3]==2:
                 if not self.game.reses[self.user.number][2]: await interaction.response.send_message("You don't have any free launch platforms",ephemeral=True)
-                if rck_cst[self.g_set[0]-1]>self.game.reses[self.user.number][1]: await interaction.response.send_message("You don't have enough production right now",ephemeral=True)
+                elif rck_cst[self.g_set[0]-1]>self.game.reses[self.user.number][1]: await interaction.response.send_message("You don't have enough production right now",ephemeral=True)
                 else:
                     await self.game.proceed()
                     await self.sh_map(1)
@@ -325,12 +333,10 @@ class T_mes(DesignerView):
             self.stop()
         okay.callback = ok
         row = ActionRow(okay)
-        window = Container(row, text1, text2)
+        window = Container(text1, text2, row, color=Color.from_rgb(255, 0, 0))
         self.add_item(window)
-    def __del__(self):
-        print("temporal message deleted")
-        
-
+    def __del__(self): print("temporal message deleted")
+    
 class MyUser:
     def __init__(self):
         self.id = None
@@ -340,8 +346,7 @@ class MyUser:
         self.game = None
         self.message = None
         self.number = None
-    def __del__(self):
-        print("game view deleted")
+    def __del__(self): print("game view deleted")
     @classmethod
     async def create(cls, ctx: discord.ApplicationContext):
         self = cls()
