@@ -52,6 +52,8 @@ class MyGame:
         self.users[0].number = False
         self.users[1].number = True
         for i in range(2):
+            for j in range(8):
+                for k in range(8): self.rads[i][j][k]=rad_shw[random.randint(0,10)]
             for j in range(len(self.counts[i])):
                 k=0
                 while k != self.counts[i][j]:
@@ -59,6 +61,7 @@ class MyGame:
                     r2 = random.randint(0, 7)
                     if not self.grounds[i][r1][r2]:
                         self.grounds[i][r1][r2] = j+1
+                        self.rads[i][r1][r2] = rad_obj[j]
                         k+=1
         self.views[0].status.content="Your move"
         print(self.views[0].status)
@@ -77,7 +80,7 @@ class MyGame:
     async def proceed(self):
         bder=self.views[self.moveof]
         ask = bder.g_set
-        num=bder.user.number
+        num=self.moveof
         if bder.g_set[3]!=2:
             self.grounds[num][ask[1]-1][ask[2]-1]=ask[0]
             self.reses[num][1]-=prd_cst[ask[0]-1]
@@ -97,22 +100,22 @@ class MyGame:
             await self.views[(num+1)%2].sh_map(self.views[(num+1)%2].g_set[3]-1)
             await self.users[(num+1)%2].message.edit(view=self.views[(num+1)%2])
     async def next_user(self):
-        self.views[self.moveof].status.content = "Opponent's move"
-        for i in range(3): self.reses[self.moveof][i]=self.counts[self.moveof][i]*res_mov[i]
+        num=self.moveof
+        self.views[num].status.content = "Opponent's move"
         for i in range(8):
             for j in range(8):
-                if self.grounds[self.moveof][i][j]!=0:
-                    if self.rads[self.moveof][i][j]<=rad_obj[self.grounds[self.moveof][i][j]-1]: self.rads[self.moveof][i][j]=rad_obj[self.grounds[self.moveof][i][j]-1]
-                    else: self.rads[self.moveof][i][j]-=1
-                elif self.rads[self.moveof][i][j]>2: self.rads[self.moveof][i][j]-=1
-                else:
-                    self.rads[self.moveof][i][j]=rad_shw[random.randint(0,10)]
-        self.moveof=(self.moveof+1)%2
-        self.views[self.moveof].status.content = "Your move"
-        await self.views[(self.moveof+1)%2].sh_map(self.views[(self.moveof+1)%2].g_set[3]-1)
-        await self.users[(self.moveof+1)%2].message.edit(view=self.views[(self.moveof+1)%2])
+                if self.grounds[num][i][j]!=0:
+                    if self.rads[num][i][j]<=rad_obj[self.grounds[num][i][j]-1]: self.rads[num][i][j]=rad_obj[self.grounds[num][i][j]-1]
+                    else: self.rads[num][i][j]-=1
+                elif self.rads[num][i][j]>2: self.rads[num][i][j]-=1
+                else: self.rads[num][i][j]=rad_shw[random.randint(0,10)]
         await self.views[self.moveof].sh_map(self.views[self.moveof].g_set[3]-1)
         await self.users[self.moveof].message.edit(view=self.views[self.moveof])
+        self.moveof=(num+1)%2
+        self.views[self.num].status.content = "Your move"
+        await self.views[self.moveof].sh_map(self.views[self.moveof].g_set[3]-1)
+        await self.users[self.moveof].message.edit(view=self.views[self.moveof])
+        for i in range(3): self.reses[(num)%2][i]=self.counts[num][i]*res_mov[i]
 
 class MyView(DesignerView):
     def __init__(self, user):
