@@ -1,16 +1,17 @@
 from io import BytesIO
+import gc
 import os
 import random
 from dotenv import load_dotenv
 load_dotenv()
 import discord
+from discord.ext import commands
 from discord import (ApplicationContext, Bot, ButtonStyle,
     Color, File, Interaction, SeparatorSpacingSize, User)
 from discord.ui import (ActionRow, Button, Container, DesignerView,
     MediaGallery, Section, Select, Separator, TextDisplay, Thumbnail, button)
 
-fusers = {}
-modes=("Building mode","Atack mode","Radiation mode",)
+modes=("Режим строительства","Режим атаки","Режим радиации",)
 rad_emj=("<:0rd:1532872671484838139>",  "<:1rd:1530616688117022800>","<:2rd:1530616711437357146>",
          "<:3rd:1530616727229173780>","<:4rd:1530616745709146184>","<:5rd:1530616774108647476>",
          "<:6rd:1530616796111966318>","<:7rd:1530616814227427388>","<:8rd:1530616829452750880>",)
@@ -18,17 +19,31 @@ obj_emj=("<:grey:1525893303898214400>", "<:ghom:1525985697612304537>", "<:gfac:1
 num_emj=("<:zero:1527297606986764360>","<:one:1527003069726855270>", "<:two:1527001046713499840>",
          "<:thre:1527003085443043418>", "<:four:1527003120905883648>", "<:five:1527003139335651469>",
          "<:six:1527003153260876039>", "<:sevn:1527003167030509669>", "<:eigt:1527003185309552760>",)
-sym_emj=("<:wrk:1529150229193035917>","<:prd:1529150214764499084>", "<:atc:1529610411278733402>",)
+sym_emj=("<:prd:1529150214764499084>", "<:atc:1529610411278733402>",)
 wep_emj=("huh","<:nuke:1530907025855483994>",)
+
+helps=(f"Это режим строительства. Тут вы можете строить объекты. На данный момент есть три типа объектов : Города, заводы и наземные"+
+           "платформы. \n Города "+obj_emj[1]+" - основа игры. Уничтожение всех городов противника - обязательное и единственное условие победы. Также "+
+           "города дают немного производственной мощи. \nЗаводы "+obj_emj[2]+" нужны для основной производственной мощи "+sym_emj[0]+" которая нужна "+
+           "для строительства ракет и обьектов. \nПусковые установки "+obj_emj[3]+" нужны для ракетных запусков "+sym_emj[1],
+            f"Это режим атаки. Тут вы можете атаковать поле противника. Выберите координаты, тип орудия и запускайте. \n"+
+            "Вам показывается радиационная карта поля противника. По ней вы можете определить местоположение вражеских обьектов. \n"+
+           "Радиация 2 и меньше естественна - она появляется на пустых клетках спонтанно. Обьекты выделяют стабильную, неизменяемую радиацию. \n"+
+           "Радиация больше 2 - следствие ваших атак. Она постепенно рассеивается, пока не уменьшается до естественных показателей. \n"+
+           "Для поиска клеток с объектами ищите клетки с неменяющейся радиацией. Заводы "+obj_emj[2]+" и пусковые установки "+obj_emj[3]+" дают 2 радиации, Города "+obj_emj[1]+" - одну. \n"+
+           "Для победы уничтожьте все города "+obj_emj[1]+" противника. Про функции обьектов можете прочитать на страничке помощи режима строительства",
+           f"Это режим радиации. Тут вы можете строить. Тут вам показывается радиационная карта вашего поля \n"+
+           "Про свойства радиации можете прочитать на страничке помощи режима атаки \n"+
+           "Про функции объектов можете прочитать на страничке помощи режима строительства")
+
 blac = "<:black:1527003711849631855>"
-prd_cst = (10, 20, 10,)
-wrk_cst = (20, 10, 10,)
+prd_cst = (30, 20, 10,)
+obj_prd = (10, 3)
 rck_cst = (10,)
-res_mov = (10, 10, 1,)
 rad_rck = (4,)
 rad_obj = (1, 2, 2,)
 rad_shw = (0,) * 8 + (1,) * 2 + (2,)
-
+fusers={}
 
 class MyGame:
     def __init__(self):
@@ -37,7 +52,7 @@ class MyGame:
         self.grounds = [[[0] * 8 for i in range(8)], [[0] * 8 for i in range(8)]]
         self.rads = [[[0] * 8 for i in range(8)], [[0] * 8 for i in range(8)]]
         self.counts = [[2, 2, 1], [2, 2, 1]]
-        self.reses = [[20, 20, 1], [20, 20, 1]]
+        self.reses = [[26, 1], [26, 1]]
         self.moveof = False
     def __del__(self): print("game session deleted")
     async def create(self, player1, player2):
@@ -63,9 +78,8 @@ class MyGame:
                         self.grounds[i][r1][r2] = j+1
                         self.rads[i][r1][r2] = rad_obj[j]
                         k+=1
-        self.views[0].status.content="Your move"
-        print(self.views[0].status)
-        self.views[1].status.content="Opponent's move"
+        self.views[0].status.content="Ваш ход"
+        self.views[1].status.content="Ход противника"
         await self.views[0].show_game()
         await self.views[1].show_game()
     async def user_lost(self, user):
@@ -83,25 +97,24 @@ class MyGame:
         num=self.moveof
         if bder.g_set[3]!=2:
             self.grounds[num][ask[1]-1][ask[2]-1]=ask[0]
-            self.reses[num][1]-=prd_cst[ask[0]-1]
-            self.reses[num][0]-=wrk_cst[ask[0]-1]
+            self.reses[num][0]-=prd_cst[ask[0]-1]
             self.counts[num][ask[0]-1]+=1
         else:
             if self.grounds[(num+1)%2][ask[1]-1][ask[2]-1]!=0:
                 self.counts[(num+1)%2][self.grounds[(num+1)%2][ask[1]-1][ask[2]-1]-1]-=1
                 if self.counts[(num+1)%2][0]==0: await self.user_lost(self.views[(num+1)%2])
                 else:
-                    t="Your object was destroyed! Coordinates: h=" + str(ask[1]) + ", w=" + str(ask[2])
+                    t="Ваш обьект был уничтожен. Координаты: h=" + str(ask[1]) + ", w=" + str(ask[2])
                     await self.users[(num+1)%2].temp_msg(t)
                     self.grounds[(num+1)%2][ask[1]-1][ask[2]-1]=0
-            self.reses[num][1]-=rck_cst[ask[0]-1]
-            self.reses[num][2]-=1
+            self.reses[num][0]-=rck_cst[ask[0]-1]
+            self.reses[num][1]-=1
             if self.rads[(num+1)%2][ask[1]-1][ask[2]-1]<rad_rck[ask[0]-1]: self.rads[(num+1)%2][ask[1]-1][ask[2]-1]=rad_rck[ask[0]-1]
             await self.views[(num+1)%2].sh_map(self.views[(num+1)%2].g_set[3]-1)
             await self.users[(num+1)%2].message.edit(view=self.views[(num+1)%2])
     async def next_user(self):
         num=self.moveof
-        self.views[num].status.content = "Opponent's move"
+        self.views[num].status.content = "Ход противника"
         for i in range(8):
             for j in range(8):
                 if self.grounds[num][i][j]!=0:
@@ -112,10 +125,11 @@ class MyGame:
         await self.views[self.moveof].sh_map(self.views[self.moveof].g_set[3]-1)
         await self.users[self.moveof].message.edit(view=self.views[self.moveof])
         self.moveof=(num+1)%2
-        self.views[self.num].status.content = "Your move"
+        self.views[self.num].status.content = "Ваш ход"
         await self.views[self.moveof].sh_map(self.views[self.moveof].g_set[3]-1)
         await self.users[self.moveof].message.edit(view=self.views[self.moveof])
-        for i in range(3): self.reses[(num)%2][i]=self.counts[num][i]*res_mov[i]
+        self.reses[(num)%2][0]=self.counts[num][0]*obj_prd[0]+self.counts[num][1]*obj_prd[1]
+        self.reses[(num)%2][1]=self.counts[num][2]
 
 class MyView(DesignerView):
     def __init__(self, user):
@@ -124,10 +138,11 @@ class MyView(DesignerView):
         self.menu = None
         self.table = None
         self.screen = TextDisplay("PLACEHOLDER")
-        self.status = TextDisplay("Welcome! Start a game to play")
+        self.status = TextDisplay("Добро пожаловать. Нажмите СТАРТ чтобы запустить игру")
         self.selects = []
         self.rovv = None
         self.g_set = [0, 0, 0, 1]
+        self.message = None
         super().__init__(timeout=None)
     def __del__(self): print("game view deleted")
     async def create_menu(self):
@@ -135,35 +150,47 @@ class MyView(DesignerView):
         thumbnail = Thumbnail(bot.user.display_avatar.url)
         section = Section(text1, self.status, accessory=thumbnail)
         self.menu = Container(section, color=Color.from_rgb(180, 180, 180))
-        async def delete_callback(interaction: Interaction):
+        #KILL VIEW AND USER
+        async def delete_callback(interaction: Interaction): 
             fusers.pop(self.user.id, None)
-            await interaction.response.defer()
-            await self.user.thread.delete()
-            self.stop()
-            self.user.view = None
+            self.clear_items()
+            self.status = None
+            self.selects = None
+            self.rovv = None
+            self.g_set = None
+            self.message = None
+            self.menu = None
+            self.table = None
+            self.screen = None
+            await interaction.message.delete()
             self.user = None
+            self.stop()
+            self.id = None
+            return
         async def play_callback(interaction: Interaction):
-            if self.user.id in fusers: await interaction.response.send_message("You already are waiting for opponent",ephemeral=True)
+            if self.user.id in fusers: await interaction.response.send_message("Пожалуйста, подождите",ephemeral=True)
             elif len(fusers) == 0:
                 fusers[self.user.id] = self.user
-                await interaction.response.send_message("Waiting for the opponent",ephemeral=True)
+                await interaction.response.send_message("Подождите, мы ищем вам соперника",ephemeral=True)
             else:
                 opponent = next(iter(fusers.values()))
                 game = MyGame()
                 await game.create(self.user, opponent)
-                await interaction.response.send_message("The game started! Good luck!",ephemeral=True)
-        delete_button = Button(label="Delete Thread", style=ButtonStyle.red)
+                await interaction.response.send_message("Игра началась. Удачи",ephemeral=True)
+        delete_button = Button(label="ВЫХОД", style=ButtonStyle.red)
         delete_button.callback = delete_callback
-        play_button = Button(label="Start the game", style=ButtonStyle.green)
+        play_button = Button(label="СТАРТ", style=ButtonStyle.green)
         play_button.callback = play_callback
         row = ActionRow()
         row.add_item(delete_button)
         row.add_item(play_button)
         self.menu.add_item(row)
-    async def show_menu(self):
+        return
+    async def show_menu(self): #SHOW MENU
         self.clear_items()
         self.add_item(self.menu)
         await self.message.edit(view=self)
+        return
     async def create_table(self):
         self.table = Container(color=Color.from_rgb(180, 180, 180))
         thumbnail1 = Thumbnail(bot.user.display_avatar.url)
@@ -175,39 +202,39 @@ class MyView(DesignerView):
         self.table.add_item(self.screen)
         m_input = Select(placeholder = modes[0], min_values = 1, max_values = 1,
             options = [
-                discord.SelectOption(label = "Building mode", value="0"),
-                discord.SelectOption(label = "Atacking mode", value="1"),
-                discord.SelectOption(label = "Radiation mode", value="2")])
+                discord.SelectOption(label = modes[0], value="0"),
+                discord.SelectOption(label = modes[1], value="1"),
+                discord.SelectOption(label = modes[2], value="2")])
         self.selects.append(
-            Select(placeholder = "Object", min_values = 1, max_values = 1,
+            Select(placeholder = "Обьект", min_values = 1, max_values = 1,
                 options = [
                     discord.SelectOption(
-                        label="Overground city, 10 prod, 20 work",
+                        label="Наземный город. Цена: 30 п.м, доход: 3.п.м.",
                         value="1",
                         emoji=discord.PartialEmoji(name="ghom",id=1525985697612304537)),
                     discord.SelectOption(
-                        label="Overground factory, 20 prod, 10 work",
+                        label="Наземный завод. Цена: 20 п.м, доход: 10 п.м.",
                         value="2",
                         emoji=discord.PartialEmoji(name="gfac",id=1525896582036324372)),
                     discord.SelectOption(
-                        label="Launching_platform, 10 prod, 10 work",
+                        label="Пусковая платформа. Цена:10 п.м, дает 1 запуск в ход",
                         value="3",
                         emoji=discord.PartialEmoji(name="glan",id=1529613092257005744))]))
         self.selects.append(
-            Select(placeholder = "Rocket", min_values = 1, max_values = 1,
+            Select(placeholder = "Орудие", min_values = 1, max_values = 1,
                 options = [
                     discord.SelectOption(
-                        label="Ordinal nuke, 10 prod",
+                        label="Обычная ядерная бомба. 10 п.м.",
                         value="1",
                         emoji=discord.PartialEmoji(name="nuke",id=1530907025855483994))]))
-        y_input = Select(placeholder = "Vertical", min_values = 1, max_values = 1,
+        y_input = Select(placeholder = "Координата по вертикали", min_values = 1, max_values = 1,
             options = [discord.SelectOption(label=str(i), value=str(i))for i in range(1, 9)])
-        x_input = Select(placeholder = "Horizontal", min_values = 1, max_values = 1,
+        x_input = Select(placeholder = "Координата по горизонтали", min_values = 1, max_values = 1,
             options = [discord.SelectOption(label=str(i), value=str(i))for i in range(1, 9)])
-        prc_but = Button(label="PROCEED", style=ButtonStyle.green)
-        pas_but = Button(label="End the move", style=ButtonStyle.grey)
-        hel_but = Button(label="Help", style=ButtonStyle.grey)
-        sur_but = Button(label="Surrender", style=ButtonStyle.red)
+        prc_but = Button(label="ПОДТВЕРДИТЬ", style=ButtonStyle.green)
+        pas_but = Button(label="Закончить ход", style=ButtonStyle.grey)
+        hel_but = Button(label="Помощь", style=ButtonStyle.grey)
+        sur_but = Button(label="Сдаться", style=ButtonStyle.red)
         async def m_set(interaction: Interaction):
             mod = int(m_input.values[0])
             m_input.placeholder = modes[mod]
@@ -218,7 +245,6 @@ class MyView(DesignerView):
                 self.rovv.remove_item(self.selects[(mod+1)%2])
                 self.rovv.add_item(self.selects[mod%2])
             except: pass
-            print(self.g_set[3])
             await interaction.response.edit_message(view=self)
         async def b_set(interaction: Interaction):
             await interaction.response.defer()
@@ -233,11 +259,11 @@ class MyView(DesignerView):
             await interaction.response.defer()
             self.g_set[2]=int(x_input.values[0])
         async def act_ask(interaction: Interaction):
-            if self.game.moveof != self.user.number: await interaction.response.send_message("It's not your move!",ephemeral=True)
-            elif 0 in self.g_set: await interaction.response.send_message("You did not chosed the object or the coordinates",ephemeral=True)
+            if self.game.moveof != self.user.number: await interaction.response.send_message("Сейчас не ваш ход",ephemeral=True)
+            elif 0 in self.g_set: await interaction.response.send_message("Вы не выбрали координаты или тип объекта/орудия",ephemeral=True)
             elif self.g_set[3]==2:
-                if not self.game.reses[self.user.number][2]: await interaction.response.send_message("You don't have any free launch platforms",ephemeral=True)
-                elif rck_cst[self.g_set[0]-1]>self.game.reses[self.user.number][1]: await interaction.response.send_message("You don't have enough production right now",ephemeral=True)
+                if not self.game.reses[self.user.number][1]: await interaction.response.send_message("У вас нет свободных пусковых платформ",ephemeral=True)
+                elif rck_cst[self.g_set[0]-1]>self.game.reses[self.user.number][0]: await interaction.response.send_message("У вас недостаточно производственной мощи",ephemeral=True)
                 else:
                     await self.game.proceed()
                     await self.sh_map(1)
@@ -247,9 +273,8 @@ class MyView(DesignerView):
                     y_input.value=[]
                     self.g_set=[0, 0, 0, self.g_set[3]]
                     await interaction.response.edit_message(view=self)
-            elif self.game.grounds[self.user.number][self.g_set[1]-1][self.g_set[2]-1]!=0: await interaction.response.send_message("It is already an object in this spot",ephemeral=True)
-            elif wrk_cst[self.g_set[0]-1]>self.game.reses[self.user.number][0]: await interaction.response.send_message("You don't have enough workforce right now",ephemeral=True)
-            elif prd_cst[self.g_set[0]-1]>self.game.reses[self.user.number][1]: await interaction.response.send_message("You don't have enough production right now",ephemeral=True)
+            elif self.game.grounds[self.user.number][self.g_set[1]-1][self.g_set[2]-1]!=0: await interaction.response.send_message("У вас уже есть обьект на данных координатах",ephemeral=True)
+            elif prd_cst[self.g_set[0]-1]>self.game.reses[self.user.number][0]: await interaction.response.send_message("У вас недостаточно производственной мощи",ephemeral=True)
             else:
                 await self.game.proceed()
                 await self.sh_map(int(self.g_set[3]-1))
@@ -260,12 +285,13 @@ class MyView(DesignerView):
                 self.g_set=[0, 0, 0, self.g_set[3]]
                 await interaction.response.edit_message(view=self)
         async def pass_move(interaction: Interaction):
-            if self.game.moveof != self.user.number: await interaction.response.send_message("It's not your move!",ephemeral=True)
+            if self.game.moveof != self.user.number: await interaction.response.send_message("Сейчас не ваш ход",ephemeral=True)
             else:
                 await interaction.response.defer()
                 await self.game.next_user()
         async def hint(interaction: Interaction):
-            await interaction.response.send_message("This function is not ready yet",ephemeral=True)
+            try:await interaction.response.send_message(helps[self.g_set[3]-1],ephemeral=True)
+            except: await interaction.response.send_message("Эта страница еще не готова",ephemeral=True)
         async def surrender(interaction: Interaction):
             await interaction.response.defer()
             await self.game.user_lost(self)
@@ -290,6 +316,7 @@ class MyView(DesignerView):
         self.table.add_item(row4)
     async def sh_map(self, mode):
         num = self.user.number
+        self.screen.content=f""
         match mode:
             case 0:
                     ground = self.game.grounds[num]
@@ -297,19 +324,22 @@ class MyView(DesignerView):
             case 1:
                     ground = self.game.rads[(num+1)%2]
                     emj_set = rad_emj
+                    for i in range(9): self.screen.content += rad_emj[i]
+                    self.screen.content+="\n"
             case 2:
                     ground = self.game.rads[num]
                     emj_set = rad_emj
+                    for i in range(9): self.screen.content += rad_emj[i]
+                    self.screen.content+="\n"
         res = self.game.reses[num]
-        self.screen.content=f""+blac
-        for i in range(1,9): self.screen.content += num_emj[i]
+        for i in range(9): self.screen.content += num_emj[i]
         self.screen.content+=blac
-        for i in range(3):
+        for i in range(2):
             self.screen.content+="\n"+num_emj[i+1]
             for j in range(8): self.screen.content+=emj_set[ground[i][j]]
             self.screen.content+=sym_emj[i]
             for j in str(res[i]): self.screen.content+=num_emj[int(j)]
-        for i in range(3,8):
+        for i in range(2,8):
             self.screen.content+="\n"+num_emj[i+1]
             for j in range(8): self.screen.content+=emj_set[ground[i][j]]
     async def show_game(self):
@@ -319,23 +349,30 @@ class MyView(DesignerView):
         await self.message.edit(view=self) 
     async def defeat(self):
         await self.show_menu()
-        self.status.content = "You lost. But you can play again!"
+        self.status.content = "Вы проиграли. Но вы можете сыграть еще раз!"
         await self.user.message.edit(view=self)
     async def victory(self):
         await self.show_menu()
-        self.status.content = "You won, congrats with survival! One more round?"
+        self.status.content = "Поздравляем с победой и выживанием! Хотите сыграть еще раз?"
         await self.user.message.edit(view=self)
 
 class T_mes(DesignerView):
     def __init__(self, t):
         self.txt = t
         super().__init__(timeout=None)
-        text1 = TextDisplay("# MESSAGE")
+        text1 = TextDisplay("# СООБЩЕНИЕ")
         text2 = TextDisplay(self.txt)
         okay = Button(label="OK", style=ButtonStyle.grey)
         async def ok(interaction: Interaction):
             await interaction.message.delete()
+            self.clear_items()
             self.stop()
+            self.id = None
+            self._message = None
+            self.author = None
+            self.flags = None
+            print(self.__dict__)
+            return
         okay.callback = ok
         row = ActionRow(okay)
         window = Container(text1, text2, row, color=Color.from_rgb(255, 0, 0))
@@ -351,26 +388,30 @@ class MyUser:
         self.game = None
         self.message = None
         self.number = None
-    def __del__(self): print("game view deleted")
+        self.dm = None
+    def __del__(self):
+        print("game user deleted")
     @classmethod
     async def create(cls, ctx: discord.ApplicationContext):
         self = cls()
         self.name = ctx.author.name
         self.id = ctx.author.id
-        self.thread = await ctx.channel.create_thread(name=f"{ctx.author.name}'s game",)
-            #type=discord.ChannelType.private_thread, invitable=False)
-        await self.thread.add_user(ctx.author)
-        await self.thread.send(f"The new game thread for {self.name} was created")
+        self.dm = await ctx.author.create_dm()
+        async for message in self.dm.history(limit=None):
+            if message.author == bot.user:
+                try: await message.delete()
+                except: pass
         self.view = MyView(self)
-        await self.view.create_table()
         await self.view.create_menu()
-        self.message = await self.thread.send(view=self.view)
-        await self.view.show_menu()
-        await ctx.send(f"{self.thread.mention} thread for {self.name} created")
+        self.message = await self.dm.send(content=f"Menu for {self.name}",view=self.view)
+        self.view.clear_items()
+        self.view.add_item(self.view.menu)
+        await self.message.edit(content=None, view=self.view)
+        await self.view.create_table()
         return self
     async def temp_msg(self, txt):
         temp = T_mes(txt)
-        await self.thread.send(view=temp)
+        await self.dm.send(view=temp)
         
 bot = Bot()
 
@@ -378,11 +419,17 @@ bot = Bot()
 async def on_ready():
     global events
     print(f"{bot.user} is ready and online!")
+    return
 
-@bot.slash_command(name="start", description="start the game (not ready yet)")
+@bot.slash_command(name="start", description="start the game")
 async def new_game(ctx: discord.ApplicationContext):
-    await ctx.respond("creating the thread...",ephemeral=True)
-    global fusers
+    if ctx.guild is None:
+        await ctx.respond("Эта команда доступна только на сервере.",ephemeral=True)
+        return
+    await ctx.respond("Создаем меню",ephemeral=True)
     user=await MyUser.create(ctx)
+    global fusers
+    await ctx.followup.send("Меню для вас создано в личном чате",ephemeral=True)
+    return
     
 bot.run(os.getenv('TOKEN'))
