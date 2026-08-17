@@ -26,22 +26,23 @@ helps=(f"Это режим строительства. Тут вы можете 
            "платформы. \n Города "+obj_emj[1]+" - основа игры. Уничтожение всех городов противника - обязательное и единственное условие победы. Также "+
            "города дают немного производственной мощи. \nЗаводы "+obj_emj[2]+" нужны для основной производственной мощи "+sym_emj[0]+" которая нужна "+
            "для строительства ракет и обьектов. \nПусковые установки "+obj_emj[3]+" нужны для ракетных запусков "+sym_emj[1]+" \n"+
-           "Произвдоственная мощность "+sym_emj[0]+" и ракетные запуски "+sym_emj[1]+" не копятся - если они не были использованы - значит заводы и установки просто простояли этот ход \n"+
-           "Произвдоственная мощность "+sym_emj[0]+" и ракетные запуски "+sym_emj[1]+" обновляются в начале хода"
-            f"Это режим атаки. Тут вы можете атаковать поле противника. Выберите координаты, тип орудия и запускайте. \n"+
-            "Вам показывается радиационная карта поля противника. По ней вы можете определить местоположение вражеских обьектов. \n"+
-           "Радиация 2 и меньше естественна - она появляется на пустых клетках спонтанно. Обьекты выделяют стабильную, неизменяемую радиацию. \n"+
-           "Радиация больше 2 - следствие ваших атак. Она постепенно рассеивается, пока не уменьшается до естественных показателей. \n"+
-           "Для поиска клеток с объектами ищите клетки с неменяющейся радиацией. Заводы "+obj_emj[2]+" и пусковые установки "+obj_emj[3]+" дают 2 радиации, Города "+obj_emj[1]+" - одну. \n"+
-           "Для победы уничтожьте все города "+obj_emj[1]+" противника. Про функции обьектов можете прочитать на страничке помощи режима строительства \n"+
+           "Произвдоственная мощность "+sym_emj[0]+" и ракетные запуски "+sym_emj[1]+" не копятся - если они не были использованы - значит заводы и установки просто простояли этот ход.\n"+
+           "Произвдоственная мощность "+sym_emj[0]+" и ракетные запуски "+sym_emj[1]+" обновляются в начале хода",
+            f"Это режим атаки. Тут вы можете атаковать поле противника. Выберите координаты, тип орудия и запускайте.\n"+
+            "Вам показывается радиационная карта поля противника. По ней вы можете определить местоположение вражеских обьектов.\n"+
+           "Над картой показано, какой цвет показывает какой уровень радиации\n"+
+           "Радиация 2 и меньше естественна - она появляется на пустых клетках спонтанно. Обьекты выделяют стабильную, неизменяемую радиацию.\n"+
+           "Радиация больше 2 - следствие ваших атак. Она постепенно рассеивается, пока не уменьшается до естественных показателей.\n"+
+           "Для поиска клеток с объектами ищите клетки с неменяющейся радиацией. Заводы "+obj_emj[2]+" и пусковые установки "+obj_emj[3]+" дают 2 радиации, Города "+obj_emj[1]+" - одну.\n"+
+           "Для победы уничтожьте все города "+obj_emj[1]+" противника. Про функции обьектов можете прочитать на страничке помощи режима строительства\n"+
            "Радиация обновляется в конце хода. Радиация не распространяется на соседние клетки - эта механика не добавлена",
-           f"Это режим радиации. Тут вы можете строить. Тут вам показывается радиационная карта вашего поля \n"+
-           "Про свойства радиации можете прочитать на страничке помощи режима атаки \n"+
+           f"Это режим радиации. Тут вы можете строить. Тут вам показывается радиационная карта вашего поля\n"+
+           "Про свойства радиации можете прочитать на страничке помощи режима атаки\n"+
            "Про функции объектов можете прочитать на страничке помощи режима строительства")
 
 blac = "<:black:1527003711849631855>"
 prd_cst = (30, 20, 10,)
-obj_prd = (10, 3)
+obj_prd = (10, 5)
 rck_cst = (10,)
 rad_rck = (4,)
 rad_obj = (1, 2, 2,)
@@ -55,7 +56,7 @@ class MyGame:
         self.grounds = [[[0] * 8 for i in range(8)], [[0] * 8 for i in range(8)]]
         self.rads = [[[0] * 8 for i in range(8)], [[0] * 8 for i in range(8)]]
         self.counts = [[2, 2, 1], [2, 2, 1]]
-        self.reses = [[26, 1], [26, 1]]
+        self.reses = [[30, 1], [30, 1]]
         self.moveof = False
     def __del__(self): print("game session deleted")
     async def create(self, player1, player2):
@@ -82,6 +83,7 @@ class MyGame:
                         self.rads[i][r1][r2] = rad_obj[j]
                         k+=1
         self.views[0].status.content="Ваш ход"
+        await self.users[1].temp_msg("Игра началась, удачи.")
         self.views[1].status.content="Ход противника"
         await self.views[0].show_game()
         await self.views[1].show_game()
@@ -128,7 +130,7 @@ class MyGame:
         await self.views[self.moveof].sh_map(self.views[self.moveof].g_set[3]-1)
         await self.users[self.moveof].message.edit(view=self.views[self.moveof])
         self.moveof=(num+1)%2
-        self.views[self.num].status.content = "Ваш ход"
+        self.views[self.moveof].status.content = "Ваш ход"
         await self.views[self.moveof].sh_map(self.views[self.moveof].g_set[3]-1)
         await self.users[self.moveof].message.edit(view=self.views[self.moveof])
         self.reses[(num)%2][0]=self.counts[num][0]*obj_prd[0]+self.counts[num][1]*obj_prd[1]
@@ -212,7 +214,7 @@ class MyView(DesignerView):
             Select(placeholder = "Обьект", min_values = 1, max_values = 1,
                 options = [
                     discord.SelectOption(
-                        label="Наземный город. Цена: 30 п.м, доход: 3.п.м.",
+                        label="Наземный город. Цена: 30 п.м, доход: 5.п.м.",
                         value="1",
                         emoji=discord.PartialEmoji(name="ghom",id=1525985697612304537)),
                     discord.SelectOption(
@@ -294,7 +296,7 @@ class MyView(DesignerView):
                 await self.game.next_user()
         async def hint(interaction: Interaction):
             try:await interaction.response.send_message(helps[self.g_set[3]-1],ephemeral=True)
-            except: await interaction.response.send_message("Эта страница еще не готова",ephemeral=True)
+            except: await interaction.response.send_message("Ошибка",ephemeral=True)
         async def surrender(interaction: Interaction):
             await interaction.response.defer()
             await self.game.user_lost(self)
@@ -374,7 +376,8 @@ class T_mes(DesignerView):
             self._message = None
             self.author = None
             self.flags = None
-            print(self.__dict__)
+            self.txt = None
+            self.children = None
             return
         okay.callback = ok
         row = ActionRow(okay)
@@ -435,8 +438,8 @@ async def new_game(ctx: discord.ApplicationContext):
         global fusers
         await ctx.followup.send("Меню для вас создано в личном чате",ephemeral=True)
         return
-    except:
-        await ctx.respond("Игра идёт в личном чате, пожалуйста, откройте личный чат боту",ephemeral=True)
-        return
+    except discord.Forbidden as e:
+            await interaction.response.send_message(f"Не удалось отправить тестовое сообщение: {e}. ",ephemeral=True,)
+            return
     
 bot.run(os.getenv('TOKEN'))
