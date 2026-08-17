@@ -42,7 +42,7 @@ helps=(f"Это режим строительства. Тут вы можете 
 
 blac = "<:black:1527003711849631855>"
 prd_cst = (30, 20, 10,)
-obj_prd = (10, 5)
+obj_prd = (5, 10)
 rck_cst = (10,)
 rad_rck = (4,)
 rad_obj = (1, 2, 2,)
@@ -127,14 +127,15 @@ class MyGame:
                     else: self.rads[num][i][j]-=1
                 elif self.rads[num][i][j]>2: self.rads[num][i][j]-=1
                 else: self.rads[num][i][j]=rad_shw[random.randint(0,10)]
-        await self.views[self.moveof].sh_map(self.views[self.moveof].g_set[3]-1)
-        await self.users[self.moveof].message.edit(view=self.views[self.moveof])
+        await self.views[num].sh_map(self.views[num].g_set[3]-1)
+        await self.users[num].message.edit(view=self.views[num])
         self.moveof=(num+1)%2
-        self.views[self.moveof].status.content = "Ваш ход"
-        await self.views[self.moveof].sh_map(self.views[self.moveof].g_set[3]-1)
-        await self.users[self.moveof].message.edit(view=self.views[self.moveof])
-        self.reses[(num)%2][0]=self.counts[num][0]*obj_prd[0]+self.counts[num][1]*obj_prd[1]
-        self.reses[(num)%2][1]=self.counts[num][2]
+        num=self.moveof
+        self.views[num].status.content = "Ваш ход"
+        self.reses[num][0]=self.counts[num][0]*obj_prd[0]+self.counts[num][1]*obj_prd[1]
+        self.reses[num][1]=self.counts[num][2]
+        await self.views[num].sh_map(self.views[num].g_set[3]-1)
+        await self.users[num].message.edit(view=self.views[num])
 
 class MyView(DesignerView):
     def __init__(self, user):
