@@ -48,6 +48,7 @@ rad_rck = (4,)
 rad_obj = (1, 2, 2,)
 rad_shw = (0,) * 8 + (1,) * 2 + (2,)
 fusers={}
+min_cost = 10
 
 class MyGame:
     def __init__(self):
@@ -83,7 +84,8 @@ class MyGame:
                         self.rads[i][r1][r2] = rad_obj[j]
                         k+=1
         self.views[0].status.content="Ваш ход"
-        await self.users[1].temp_msg("Игра началась, удачи.")
+        await self.users[1].temp_msg("# ИГРА НАЧАЛАСЬ", "Удачной игры")
+        await self.users[0].temp_msg("# ИГРА НАЧАЛАСЬ", "Удачной игры")
         self.views[1].status.content="Ход противника"
         await self.views[0].show_game()
         await self.views[1].show_game()
@@ -109,14 +111,15 @@ class MyGame:
                 self.counts[(num+1)%2][self.grounds[(num+1)%2][ask[1]-1][ask[2]-1]-1]-=1
                 if self.counts[(num+1)%2][0]==0: await self.user_lost(self.views[(num+1)%2])
                 else:
-                    t="Ваш обьект был уничтожен. Координаты: h=" + str(ask[1]) + ", w=" + str(ask[2])
-                    await self.users[(num+1)%2].temp_msg(t)
+                    t="Координаты: h=" + str(ask[1]) + ", w=" + str(ask[2])
+                    await self.users[(num+1)%2].temp_msg("# ВАШ ОБЪЕКТ БЫЛ УНИЧТОЖЕН",t)
                     self.grounds[(num+1)%2][ask[1]-1][ask[2]-1]=0
             self.reses[num][0]-=rck_cst[ask[0]-1]
             self.reses[num][1]-=1
             if self.rads[(num+1)%2][ask[1]-1][ask[2]-1]<rad_rck[ask[0]-1]: self.rads[(num+1)%2][ask[1]-1][ask[2]-1]=rad_rck[ask[0]-1]
             await self.views[(num+1)%2].sh_map(self.views[(num+1)%2].g_set[3]-1)
             await self.users[(num+1)%2].message.edit(view=self.views[(num+1)%2])
+        if self.reses[num][0]<min_cost: await self.next_user()
     async def next_user(self):
         num=self.moveof
         self.views[num].status.content = "Ход противника"
@@ -131,6 +134,7 @@ class MyGame:
         await self.users[num].message.edit(view=self.views[num])
         self.moveof=(num+1)%2
         num=self.moveof
+        await self.users[num].temp_msg("# ВАШ ХОД","противник закончил ход")
         self.views[num].status.content = "Ваш ход"
         self.reses[num][0]=self.counts[num][0]*obj_prd[0]+self.counts[num][1]*obj_prd[1]
         self.reses[num][1]=self.counts[num][2]
@@ -182,7 +186,6 @@ class MyView(DesignerView):
                 opponent = next(iter(fusers.values()))
                 game = MyGame()
                 await game.create(self.user, opponent)
-                await interaction.response.send_message("Игра началась. Удачи",ephemeral=True)
         delete_button = Button(label="ВЫХОД", style=ButtonStyle.red)
         delete_button.callback = delete_callback
         play_button = Button(label="СТАРТ", style=ButtonStyle.green)
@@ -363,11 +366,12 @@ class MyView(DesignerView):
         await self.user.message.edit(view=self)
 
 class T_mes(DesignerView):
-    def __init__(self, t):
-        self.txt = t
+    def __init__(self, t1, t2):
+        self.txt1 = t1
+        self.txt2 = t2
         super().__init__(timeout=None)
-        text1 = TextDisplay("# СООБЩЕНИЕ")
-        text2 = TextDisplay(self.txt)
+        text1 = TextDisplay(self.txt1)
+        text2 = TextDisplay(self.txt2)
         okay = Button(label="OK", style=ButtonStyle.grey)
         async def ok(interaction: Interaction):
             await interaction.message.delete()
@@ -377,7 +381,8 @@ class T_mes(DesignerView):
             self._message = None
             self.author = None
             self.flags = None
-            self.txt = None
+            self.txt1 = None
+            self.txt2 = None
             self.children = None
             return
         okay.callback = ok
@@ -416,8 +421,8 @@ class MyUser:
         await self.message.edit(content=None, view=self.view)
         await self.view.create_table()
         return self
-    async def temp_msg(self, txt):
-        temp = T_mes(txt)
+    async def temp_msg(self, t1, t2):
+        temp = T_mes(t1, t2)
         await self.dm.send(view=temp)
         
 bot = Bot()
