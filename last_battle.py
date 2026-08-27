@@ -87,10 +87,9 @@ class MyGame:
         await self.users[1].temp_msg("# ИГРА НАЧАЛАСЬ", "Ход противника. Удачной игры")
         await self.users[0].temp_msg("# ИГРА НАЧАЛАСЬ", "Ваш ход. Удачной игры")
         self.views[1].status.content="Ход противника"
-        self.views[1].selects[0].disabled = True
-        self.views[1].selects[1].disabled = True
-        #self.views[1].y_input.disabled = True
-        #self.views[1].x_input.disabled = True
+        for i in range(2):
+            self.views[1].selects[i].disabled = True
+            self.views[1].table.items[i+4].items[0].disabled = True
         await self.views[0].show_game()
         await self.views[1].show_game()
     async def user_lost(self, user):
@@ -133,10 +132,10 @@ class MyGame:
             await self.next_user()
     async def next_user(self):
         num=self.moveof
-        self.views[num].selects[0].disabled = True
-        self.views[num].selects[1].disabled = True
-        #self.views[num].y_input.disabled = True
-        #self.views[num].x_input.disabled = True
+        for j in range(2):
+            for i in range(2):
+                self.views[j].selects[i].disabled = (num==j)
+                self.views[j].table.items[i+4].items[0].disabled = (num==j)
         self.views[num].status.content = "Ход противника"
         for i in range(8):
             for j in range(8):
@@ -151,10 +150,6 @@ class MyGame:
         num=self.moveof
         await self.users[num].temp_msg("# ВАШ ХОД","противник закончил ход")
         self.views[num].status.content = "Ваш ход"
-        self.views[num].selects[0].disabled = False
-        self.views[num].selects[1].disabled = False
-        #self.views[num].y_input.disabled = False
-        #self.views[num].x_input.disabled = False
         self.reses[num][0]=self.counts[num][0]*obj_prd[0]+self.counts[num][1]*obj_prd[1]
         self.reses[num][1]=self.counts[num][2]
         await self.views[num].sh_map(self.views[num].g_set[3]-1)
@@ -342,6 +337,8 @@ class MyView(DesignerView):
         self.table.add_item(row2)
         self.table.add_item(row3)
         self.table.add_item(row4)
+        #for i in self.table.items:
+            #print(i)
         #print(self.table.items)
     async def sh_map(self, mode):
         num = self.user.number
