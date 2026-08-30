@@ -35,18 +35,24 @@ helps=(f"Это режим строительства. Тут вы можете 
            "Радиация больше 2 - следствие ваших атак. Она постепенно рассеивается, пока не уменьшается до естественных показателей.\n"+
            "Для поиска клеток с объектами ищите клетки с неменяющейся радиацией. Заводы "+obj_emj[2]+" и пусковые установки "+obj_emj[3]+" дают 2 радиации, Города "+obj_emj[1]+" - одну.\n"+
            "Для победы уничтожьте все города "+obj_emj[1]+" противника. Про функции обьектов можете прочитать на страничке помощи режима строительства\n"+
-           "Радиация обновляется в конце хода. Радиация не распространяется на соседние клетки - эта механика не добавлена",
-           f"Это режим радиации. Тут вы можете строить. Тут вам показывается радиационная карта вашего поля\n"+
+           "Радиация обновляется в конце хода. Радиация не распространяется на соседние клетки - эта механика не добавлена.\n"+
+           "Радиация 8 и больше навсегда делает клетку недоступной для строительства. Используйте кобальтовые бомбы для этого.\n"+
+           "Противник, как и вы, может специально выпускать радиацию, чтобы запутать вас.",
+           f"Это режим радиации. Тут вам показывается радиационная карта вашего поля\n"+
+           "В этом режиме вы можете специально выпускать радиацию, чтобы запутать противника. \n"+
+           "Радиация 8 и больше навсегда делает клетку недоступной для строительства\n"+
            "Про свойства радиации можете прочитать на страничке помощи режима атаки\n"+
            "Про функции объектов можете прочитать на страничке помощи режима строительства")
 
 blac = "<:black:1527003711849631855>"
 prd_cst = (30, 20, 10,)
 obj_prd = (5, 10)
-rck_cst = (10,)
-rad_rck = (4,)
+rck_cst = (10, 20)
+rad_rck = (4, 8)
+rad_cst = 10
 rad_obj = (1, 2, 2,)
 rad_shw = (0,) * 8 + (1,) * 2 + (2,)
+rad_add = (1,)
 fusers={}
 min_cost = 10
 
@@ -105,28 +111,38 @@ class MyGame:
         bder=self.views[self.moveof]
         ask = bder.g_set
         num=self.moveof
-        if bder.g_set[3]!=2:
-            self.grounds[num][ask[1]-1][ask[2]-1]=ask[0]
-            self.reses[num][0]-=prd_cst[ask[0]-1]
-            self.counts[num][ask[0]-1]+=1
-        else:
-            if self.grounds[(num+1)%2][ask[1]-1][ask[2]-1]!=0:
-                self.counts[(num+1)%2][self.grounds[(num+1)%2][ask[1]-1][ask[2]-1]-1]-=1
-                if self.counts[(num+1)%2][0]==0:
-                    await self.users[num].temp_msg("# ПОБЕДА","Вы уничтожили все города противника.")
-                    await self.users[(num+1)%2].temp_msg("# ПОРАЖЕНИЕ","Противник уничтожил все ваши города")
-                    await self.user_lost(self.views[(num+1)%2])
-                    return
-                else:
+        match bder.g_set[3]:
+            case 1:
+                self.grounds[num][ask[1]-1][ask[2]-1]=ask[0]
+                self.reses[num][0]-=prd_cst[ask[0]-1]
+                self.counts[num][ask[0]-1]+=1
+            case 2:
+                if self.grounds[(num+1)%2][ask[1]-1][ask[2]-1]!=0:
+                    self.counts[(num+1)%2][self.grounds[(num+1)%2][ask[1]-1][ask[2]-1]-1]-=1
                     t="Координаты: h=" + str(ask[1]) + ", w=" + str(ask[2])
                     await self.users[(num+1)%2].temp_msg("# ВАШ ОБЪЕКТ БЫЛ УНИЧТОЖЕН",t)
                     self.grounds[(num+1)%2][ask[1]-1][ask[2]-1]=0
-            self.reses[num][0]-=rck_cst[ask[0]-1]
-            self.reses[num][1]-=1
-            if self.rads[(num+1)%2][ask[1]-1][ask[2]-1]<rad_rck[ask[0]-1]: self.rads[(num+1)%2][ask[1]-1][ask[2]-1]=rad_rck[ask[0]-1]
-            await self.views[(num+1)%2].sh_map(self.views[(num+1)%2].g_set[3]-1)
-            await self.users[(num+1)%2].message.edit(view=self.views[(num+1)%2])
-        await self.views[num].sh_map(1)
+                    if self.counts[(num+1)%2][0]==0:
+                        await self.users[num].temp_msg("# ПОБЕДА","Вы уничтожили все города противника.")
+                        await self.users[(num+1)%2].temp_msg("# ПОРАЖЕНИЕ","Противник уничтожил все ваши города")
+                        await self.user_lost(self.views[(num+1)%2])
+                        return  
+                self.reses[num][0]-=rck_cst[ask[0]-1]
+                self.reses[num][1]-=1
+                if self.rads[(num+1)%2][ask[1]-1][ask[2]-1]<rad_rck[ask[0]-1]: self.rads[(num+1)%2][ask[1]-1][ask[2]-1]=rad_rck[ask[0]-1]
+                await self.views[(num+1)%2].sh_map(self.views[(num+1)%2].g_set[3]-1)
+                await self.users[(num+1)%2].message.edit(view=self.views[(num+1)%2])
+                await self.views[num].sh_map(1)
+            case 3:
+                self.reses[num][0]-=rad_cst
+                self.rads[num][ask[1]-1][ask[2]-1]+=rad_add[ask[0]-1]
+                if self.rads[num][ask[1]-1][ask[2]-1]>=8:
+                    self.rads[num][ask[1]-1][ask[2]-1]=8
+                    await self.users[num].temp_msg("#ВЫ ПОДНЯЛИ РАДИАЦИЮ ВЫШЕ КРИТИЧЕСКОГО ПРЕДЕЛА","Данное место более недоступно для жизни и работы")
+                    self.grounds[num][ask[1]-1][ask[2]-1]=0
+                await self.views[(num+1)%2].sh_map(self.views[(num+1)%2].g_set[3]-1)
+                await self.views[num].sh_map(2)
+                await self.users[(num+1)%2].message.edit(view=self.views[(num+1)%2])
         if self.reses[num][0]<min_cost:
             await self.users[num].temp_msg("# ВАШ ХОД ОКОНЧЕН","У вас закончились ресурсы, поэтому ход передается противнику")
             await self.next_user()
@@ -139,7 +155,8 @@ class MyGame:
         self.views[num].status.content = "Ход противника"
         for i in range(8):
             for j in range(8):
-                if self.grounds[num][i][j]!=0:
+                if self.rads[num][i][j]==8: pass
+                elif self.grounds[num][i][j]!=0:
                     if self.rads[num][i][j]<=rad_obj[self.grounds[num][i][j]-1]: self.rads[num][i][j]=rad_obj[self.grounds[num][i][j]-1]
                     else: self.rads[num][i][j]-=1
                 elif self.rads[num][i][j]>2: self.rads[num][i][j]-=1
@@ -183,6 +200,7 @@ class MyView(DesignerView):
             self.rovv = None
             self.g_set = None
             self.message = None
+            self.cont=[]
             self.menu = None
             self.table = None
             self.screen = None
@@ -249,10 +267,19 @@ class MyView(DesignerView):
                     discord.SelectOption(
                         label="Обычная ядерная бомба. 10 п.м.",
                         value="1",
-                        emoji=discord.PartialEmoji(name="nuke",id=1530907025855483994))]))
-        y_input = Select(placeholder = "Координата по вертикали", min_values = 1, max_values = 1, id = 104,
+                        emoji=discord.PartialEmoji(name="nuke",id=1530907025855483994)),
+                    discord.SelectOption(
+                        label="Кобальтовая ядерная бомба. 20 п.м, навсегда делает клетку недоступной",
+                        value="2")]))
+        self.selects.append(
+            Select(placeholder = "Действие", min_values = 1, max_values = 1, id = 104,
+                   options = [
+                       discord.SelectOption(
+                        label="Выпустить радиацию. 10 п.м, +1 еденица радиации",
+                        value="1",)]))
+        y_input = Select(placeholder = "Координата по вертикали", min_values = 1, max_values = 1, id = 105,
             options = [discord.SelectOption(label=str(i), value=str(i))for i in range(1, 9)])
-        x_input = Select(placeholder = "Координата по горизонтали", min_values = 1, max_values = 1, id = 105,
+        x_input = Select(placeholder = "Координата по горизонтали", min_values = 1, max_values = 1, id = 106,
             options = [discord.SelectOption(label=str(i), value=str(i))for i in range(1, 9)])
         prc_but = Button(label="ПОДТВЕРДИТЬ", style=ButtonStyle.green)
         pas_but = Button(label="Закончить ход", style=ButtonStyle.grey)
@@ -262,12 +289,10 @@ class MyView(DesignerView):
             mod = int(m_input.values[0])
             m_input.placeholder = modes[mod]
             await self.sh_map(mod)
+            self.rovv.remove_item(self.selects[self.g_set[3]-1])
+            self.rovv.add_item(self.selects[mod])
             self.g_set[0] = 0
             self.g_set[3]=mod+1
-            try:
-                self.rovv.remove_item(self.selects[(mod+1)%2])
-                self.rovv.add_item(self.selects[mod%2])
-            except: pass
             await interaction.response.edit_message(view=self)
         async def b_set(interaction: Interaction):
             await interaction.response.defer()
@@ -275,6 +300,9 @@ class MyView(DesignerView):
         async def r_set(interaction: Interaction):
             await interaction.response.defer()
             self.g_set[0]=int(self.selects[1].values[0])
+        async def a_set(interaction: Interaction):
+            await interaction.response.defer()
+            self.g_set[0]=int(self.selects[2].values[0])
         async def y_set(interaction: Interaction):
             await interaction.response.defer()
             self.g_set[1]=int(y_input.values[0])
@@ -283,30 +311,43 @@ class MyView(DesignerView):
             self.g_set[2]=int(x_input.values[0])
         async def act_ask(interaction: Interaction):
             await interaction.response.defer()
-            if self.game.moveof != self.user.number: await interaction.response.followup("Сейчас не ваш ход",ephemeral=True)
-            elif 0 in self.g_set: await interaction.response.followup("Вы не выбрали координаты или тип объекта/орудия",ephemeral=True)
-            elif self.g_set[3]==2:
-                if not self.game.reses[self.user.number][1]: await interaction.response.followup("У вас нет свободных пусковых платформ",ephemeral=True)
-                elif rck_cst[self.g_set[0]-1]>self.game.reses[self.user.number][0]: await interaction.response.followup("У вас недостаточно производственной мощи",ephemeral=True)
-                else:
-                    await self.game.proceed()
-                    x_input.value=[]
-                    y_input.value=[]
-                    self.g_set=[0, 0, 0, self.g_set[3]]
-                    await interaction.message.edit(view=self)
-            elif self.game.grounds[self.user.number][self.g_set[1]-1][self.g_set[2]-1]!=0: await interaction.response.followup("У вас уже есть обьект на данных координатах",ephemeral=True)
-            elif prd_cst[self.g_set[0]-1]>self.game.reses[self.user.number][0]: await interaction.response.followup("У вас недостаточно производственной мощи",ephemeral=True)
+            if self.game.moveof != self.user.number: await interaction.followup.send("Сейчас не ваш ход",ephemeral=True)
+            elif 0 in self.g_set: await interaction.followup.send("Вы не выбрали координаты или тип объекта/орудия",ephemeral=True)
             else:
-                await self.game.proceed()
-                await self.sh_map(int(self.g_set[3]-1))
-                self.selects[0].value=[]
-                self.selects[1].value=[]
-                x_input.value=[]
-                y_input.value=[]
-                self.g_set=[0, 0, 0, self.g_set[3]]
-                await interaction.message.edit(view=self)
+                match self.g_set[3]:
+                    case 1:
+                        if self.game.grounds[self.user.number][self.g_set[1]-1][self.g_set[2]-1]!=0: await interaction.followup.send("У вас уже есть обьект на данных координатах",ephemeral=True)
+                        elif prd_cst[self.g_set[0]-1]>self.game.reses[self.user.number][0]: await interaction.followup.send("У вас недостаточно производственной мощи",ephemeral=True)
+                        elif self.game.rads[self.user.number][self.g_set[1]-1][self.g_set[2]-1]>7: await interaction.followup.send("На данных координатах слишком высокая радиация для строительства",ephemeral=True)
+                        else:
+                            await self.game.proceed()
+                            await self.sh_map(int(self.g_set[3]-1))
+                            x_input.value=[]
+                            y_input.value=[]
+                            self.g_set=[0, 0, 0, self.g_set[3]]
+                            await interaction.message.edit(view=self)
+                    case 2:
+                        if not self.game.reses[self.user.number][1]: await interaction.followup.send("У вас нет свободных пусковых платформ",ephemeral=True)
+                        elif rck_cst[self.g_set[0]-1]>self.game.reses[self.user.number][0]: await interaction.followup.send("У вас недостаточно производственной мощи",ephemeral=True)
+                        else:
+                            await self.game.proceed()
+                            await self.sh_map(int(self.g_set[3]-1))
+                            x_input.value=[]
+                            y_input.value=[]
+                            self.g_set=[0, 0, 0, self.g_set[3]]
+                            await interaction.message.edit(view=self)
+                    case 3:
+                        if rad_cst > self.game.reses[self.user.number][0]: await interaction.followup.send("У вас недостаточно производственной мощи",ephemeral=True)
+                        elif self.game.rads[self.user.number][self.g_set[1]-1][self.g_set[2]-1] >=8: await interaction.followup.send("Нельзя повышать радиацию больше 8",ephemeral=True)
+                        else:
+                            await self.game.proceed()
+                            await self.sh_map(int(self.g_set[3]-1))
+                            x_input.value=[]
+                            y_input.value=[]
+                            self.g_set=[0, 0, 0, self.g_set[3]]
+                            await interaction.message.edit(view=self)
         async def pass_move(interaction: Interaction):
-            if self.game.moveof != self.user.number: await interaction.response.followup("Сейчас не ваш ход",ephemeral=True)
+            if self.game.moveof != self.user.number: await interaction.followup.send("Сейчас не ваш ход",ephemeral=True)
             else:
                 await interaction.response.defer()
                 await self.game.next_user()
@@ -321,6 +362,7 @@ class MyView(DesignerView):
         m_input.callback = m_set
         self.selects[0].callback = b_set
         self.selects[1].callback = r_set
+        self.selects[2].callback = a_set
         x_input.callback = x_set
         y_input.callback = y_set
         prc_but.callback = act_ask
