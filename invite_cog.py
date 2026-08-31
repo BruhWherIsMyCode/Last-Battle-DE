@@ -1,3 +1,6 @@
+import sys
+from types import SimpleNamespace
+
 import discord
 from discord.ext import commands
 import invite_db
@@ -34,6 +37,19 @@ class InviteView(discord.ui.View):
             content=f"Начинаю игру...",
             view=self,
         )
+        last_battle = sys.modules["__main__"]
+        try:
+            player1 = await last_battle.MyUser.create(SimpleNamespace(author=self.inviter))
+            player2 = await last_battle.MyUser.create(SimpleNamespace(author=self.target))
+        except discord.Forbidden:
+            await self.message.edit(
+                content="Мне не удалось создать игру! Походу у одного из игроков закрыты личные сообщения.",
+                view=None,
+            )
+            return
+        game = last_battle.MyGame()
+        await game.create(player1, player2)
+        await self.message.delete()
 
     async def decline(self, interaction: discord.Interaction):
         status = "declined" if interaction.user.id == self.target.id else "cancelled"
@@ -87,7 +103,7 @@ class InviteCog(commands.Cog):
         invite = await invite_db.create_invite(ctx.author.id, opponent.id)
         view = InviteView(invite.id, ctx.author, opponent)
         response = await ctx.respond(
-            f"{opponent.mention}, вызывает {ctx.author.mention} на дуэль!", view=view
+            f"{opponent.mention}, тебя {ctx.author.mention} вызывает на дуэль!", view=view
         )
         if isinstance(response, discord.Interaction):
             view.message = await response.original_response()
