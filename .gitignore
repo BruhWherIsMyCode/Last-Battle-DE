@@ -1,0 +1,14 @@
+*
+!.gitignore
+
+!sprites/
+!sprites/**
+
+!numbers/
+!numbers/**
+
+!all_grey.png
+!Icon.png
+!last_battle.py
+!up_fac.png
+!up_hom.png
