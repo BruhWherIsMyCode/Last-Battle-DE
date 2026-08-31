@@ -40,12 +40,11 @@ async def create_invite(inviter_id: int, target_id: int) -> Invite:
         return invite
 
 
-async def get_pending_invite(inviter_id: int, target_id: int) -> Invite | None:
+async def get_pending_by_inviter(inviter_id: int) -> Invite | None:
     async with Session() as session:
         result = await session.execute(
             select(Invite).where(
                 Invite.inviter_id == inviter_id,
-                Invite.target_id == target_id,
                 Invite.status == "pending",
             )
         )
@@ -56,5 +55,13 @@ async def set_invite_status(invite_id: int, status: str):
     async with Session() as session:
         await session.execute(
             update(Invite).where(Invite.id == invite_id).values(status=status)
+        )
+        await session.commit()
+
+
+async def expire_all_pending():
+    async with Session() as session:
+        await session.execute(
+            update(Invite).where(Invite.status == "pending").values(status="expired")
         )
         await session.commit()
