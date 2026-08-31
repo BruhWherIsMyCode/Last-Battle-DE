@@ -1,10 +1,19 @@
 import discord
 from discord.ext import commands
 
+import invite_db
+
 
 class InviteCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.db_ready = False
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        if not self.db_ready:
+            await invite_db.init_db()
+            self.db_ready = True
 
     @commands.slash_command(name="battle_invite", description="Пригласить соперника в игру")
     async def battle_invite(
@@ -21,4 +30,8 @@ class InviteCog(commands.Cog):
         if opponent.bot:
             await ctx.respond("Нельзя пригласить бота...", ephemeral=True)
             return
+        if await invite_db.get_pending_invite(ctx.author.id, opponent.id):
+            await ctx.respond("Вы уже отправили приглашение этому игроку. Дождитесь ответа.", ephemeral=True)
+            return
+        await invite_db.create_invite(ctx.author.id, opponent.id)
         await ctx.respond(f"{opponent.mention}, вас вызывает {ctx.author.mention} на дуэль!")
